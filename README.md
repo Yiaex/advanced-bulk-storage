@@ -1,5 +1,7 @@
 # MEGA Cells: Advanced Bulk Storage
 
+[English](README.en.md)
+
 这是 Applied Energistics 2 和 MEGA Cells 的扩展，适用于 Minecraft **1.21.1** 和 NeoForge **21.1.265 至 21.2 之前**。Mod ID 为 `advanced_bulk_storage`。四种大宗元件可在原生 ME 驱动器内按完整物品键存储 LONG 级库存，鼠标悬停可查看真实库存图标。扩展标签卡可解锁更多过滤语法，手持元件可管理白名单并分页查看当前库存。
 
 `1.0.0` 汇总了大宗接口性能优化、配方调整、空盘锻造样板和界面修复。升级时在客户端和服务端同时替换 Mod JAR。[1.0.0 更新日志](CHANGELOG-1.0.0.md) · [版本历史](CHANGELOG.md) · [功能清单与手动验收](RELEASE-0.6.0.md)
