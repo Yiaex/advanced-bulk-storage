@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.glass",
+  "description": "preset.advanced_bulk_storage.glass.description",
+  "category": "basic",
+  "icon": "minecraft:glass",
+  "expression": "#c:glass_blocks",
+  "weight": 16,
+  "requirement": "any"
+}

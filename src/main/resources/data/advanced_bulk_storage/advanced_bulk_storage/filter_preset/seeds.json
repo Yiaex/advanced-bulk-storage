@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.seeds",
+  "description": "preset.advanced_bulk_storage.seeds.description",
+  "category": "basic",
+  "icon": "minecraft:wheat_seeds",
+  "expression": "#c:seeds",
+  "weight": 15,
+  "requirement": "any"
+}

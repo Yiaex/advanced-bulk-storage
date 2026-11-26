@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "advanced_bulk_storage:block/overclocked_bulk_storage_migrator"
+    }
+  }
+}

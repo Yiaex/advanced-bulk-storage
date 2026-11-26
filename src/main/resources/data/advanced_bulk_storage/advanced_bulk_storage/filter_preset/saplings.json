@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.saplings",
+  "description": "preset.advanced_bulk_storage.saplings.description",
+  "category": "basic",
+  "icon": "minecraft:oak_sapling",
+  "expression": "#minecraft:saplings",
+  "weight": 10,
+  "requirement": "any"
+}

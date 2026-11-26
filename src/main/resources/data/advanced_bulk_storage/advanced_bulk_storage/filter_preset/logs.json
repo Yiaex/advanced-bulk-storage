@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.logs",
+  "description": "preset.advanced_bulk_storage.logs.description",
+  "category": "basic",
+  "icon": "minecraft:oak_log",
+  "expression": "#minecraft:logs",
+  "weight": 7,
+  "requirement": "any"
+}

@@ -1,0 +1,56 @@
+# Gradle and IDE output
+/.gradle/
+/.gradle-user-home/
+/build/
+/out/
+/bin/
+
+# Minecraft development instances and saves
+/run/
+/run-*/
+/.minecraft/
+/config/
+/saves/
+/world/
+/world_*/
+/test-world*/
+/logs/
+/crash-reports/
+*.log
+*.log.gz
+*.hprof
+
+# Extracted dependency textures and duplicate unpacked art bundle
+/art-review/ref/
+/art-review/package/
+
+# Local IDE, Python, and OS files
+.idea/
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+*.iml
+*.ipr
+*.iws
+__pycache__/
+*.py[cod]
+.venv/
+.DS_Store
+Thumbs.db
+
+# Local credentials and overrides
+.env
+.env.*
+!.env.example
+.netrc
+.git-credentials
+local.properties
+gradle-local.properties
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore

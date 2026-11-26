@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.farming",
+  "description": "preset.advanced_bulk_storage.farming.description",
+  "category": "advanced",
+  "icon": "minecraft:carrot",
+  "expression": "#c:crops | #c:seeds",
+  "weight": 21,
+  "requirement": "any"
+}

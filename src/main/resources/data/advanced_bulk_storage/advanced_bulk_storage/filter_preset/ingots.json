@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.ingots",
+  "description": "preset.advanced_bulk_storage.ingots.description",
+  "category": "basic",
+  "icon": "minecraft:iron_ingot",
+  "expression": "#c:ingots",
+  "weight": 0,
+  "requirement": "any"
+}

@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "advanced_bulk_storage:item/auto_sorting_card"
+  }
+}

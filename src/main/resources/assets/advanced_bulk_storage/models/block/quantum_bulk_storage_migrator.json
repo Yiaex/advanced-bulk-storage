@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "side": "advanced_bulk_storage:block/quantum_bulk_storage_migrator_side",
+    "top": "advanced_bulk_storage:block/quantum_bulk_storage_migrator_top",
+    "bottom": "advanced_bulk_storage:block/backplane"
+  }
+}

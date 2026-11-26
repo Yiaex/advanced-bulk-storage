@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "GPG",
+    "BIB",
+    "GPG"
+  ],
+  "key": {
+    "G": {
+      "item": "ae2:quartz_glass"
+    },
+    "P": {
+      "item": "ae2:engineering_processor"
+    },
+    "B": {
+      "item": "megacells:accumulation_processor"
+    },
+    "I": {
+      "item": "advanced_bulk_storage:bulk_storage_interface"
+    }
+  },
+  "result": {
+    "id": "advanced_bulk_storage:advanced_bulk_storage_interface",
+    "count": 1
+  }
+}

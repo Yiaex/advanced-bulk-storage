@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "PCP",
+    "BIB",
+    "PCP"
+  ],
+  "key": {
+    "P": {
+      "item": "ae2:engineering_processor"
+    },
+    "I": {
+      "item": "ae2:io_port"
+    },
+    "C": {
+      "item": "ae2:speed_card"
+    },
+    "B": {
+      "item": "ae2:quartz_glass"
+    }
+  },
+  "result": {
+    "id": "advanced_bulk_storage:bulk_storage_migrator",
+    "count": 1
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "replace": false,
+  "values": [
+    "advanced_bulk_storage:advanced_cell_workbench",
+    "advanced_bulk_storage:bulk_storage_manager",
+    "advanced_bulk_storage:bulk_storage_drive",
+    "advanced_bulk_storage:bulk_storage_monitor",
+    "advanced_bulk_storage:bulk_storage_migrator",
+    "advanced_bulk_storage:overclocked_bulk_storage_migrator",
+    "advanced_bulk_storage:quantum_bulk_storage_migrator",
+    "advanced_bulk_storage:bulk_storage_interface",
+    "advanced_bulk_storage:advanced_bulk_storage_interface"
+  ]
+}

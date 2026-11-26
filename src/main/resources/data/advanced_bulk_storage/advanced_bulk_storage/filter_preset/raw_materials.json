@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.raw_materials",
+  "description": "preset.advanced_bulk_storage.raw_materials.description",
+  "category": "basic",
+  "icon": "minecraft:raw_iron",
+  "expression": "#c:raw_materials",
+  "weight": 2,
+  "requirement": "any"
+}

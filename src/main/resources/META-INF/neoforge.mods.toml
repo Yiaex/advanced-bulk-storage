@@ -1,0 +1,45 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "MIT (code), CC BY-NC-SA 3.0 (derived textures)"
+
+[[mods]]
+modId = "advanced_bulk_storage"
+version = "${modVersion}"
+displayName = "MEGA Cells: Advanced Bulk Storage"
+description = "Multi-type bulk storage for Applied Energistics 2 and MEGA Cells."
+
+[[mixins]]
+config = "advanced_bulk_storage.mixins.json"
+
+[[dependencies.advanced_bulk_storage]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.1]"
+side = "BOTH"
+
+[[dependencies.advanced_bulk_storage]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.1.265,21.2)"
+side = "BOTH"
+
+[[dependencies.advanced_bulk_storage]]
+modId = "ae2"
+type = "required"
+versionRange = "[19.2.20,19.3)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies.advanced_bulk_storage]]
+modId = "megacells"
+type = "required"
+versionRange = "[4.11.0,5)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies.advanced_bulk_storage]]
+modId = "guideme"
+type = "required"
+versionRange = "[21.1.22,21.2)"
+ordering = "AFTER"
+side = "BOTH"

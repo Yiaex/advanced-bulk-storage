@@ -1,0 +1,107 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "side": "advanced_bulk_storage:block/backplane",
+    "top": "advanced_bulk_storage:block/advanced_cell_workbench",
+    "bottom": "advanced_bulk_storage:block/backplane",
+    "particle": "advanced_bulk_storage:block/backplane"
+  },
+  "elements": [
+    {
+      "from": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        16,
+        15,
+        16
+      ],
+      "faces": {
+        "down": {
+          "texture": "#bottom",
+          "cullface": "down"
+        },
+        "up": {
+          "texture": "#top"
+        },
+        "north": {
+          "texture": "#side",
+          "cullface": "north"
+        },
+        "south": {
+          "texture": "#side",
+          "cullface": "south"
+        },
+        "east": {
+          "texture": "#side",
+          "cullface": "east"
+        },
+        "west": {
+          "texture": "#side",
+          "cullface": "west"
+        }
+      }
+    },
+    {
+      "from": [
+        1,
+        15,
+        1
+      ],
+      "to": [
+        15,
+        16,
+        15
+      ],
+      "faces": {
+        "up": {
+          "texture": "#top",
+          "uv": [
+            1,
+            1,
+            15,
+            15
+          ]
+        },
+        "north": {
+          "texture": "#side",
+          "uv": [
+            1,
+            1,
+            15,
+            2
+          ]
+        },
+        "south": {
+          "texture": "#side",
+          "uv": [
+            1,
+            1,
+            15,
+            2
+          ]
+        },
+        "east": {
+          "texture": "#side",
+          "uv": [
+            1,
+            1,
+            15,
+            2
+          ]
+        },
+        "west": {
+          "texture": "#side",
+          "uv": [
+            1,
+            1,
+            15,
+            2
+          ]
+        }
+      }
+    }
+  ]
+}

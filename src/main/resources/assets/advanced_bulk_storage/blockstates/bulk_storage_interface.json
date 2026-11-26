@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "lit=false": {
+      "model": "advanced_bulk_storage:block/bulk_storage_interface"
+    },
+    "lit=true": {
+      "model": "advanced_bulk_storage:block/bulk_storage_interface_online"
+    }
+  }
+}

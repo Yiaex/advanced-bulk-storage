@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.wood",
+  "description": "preset.advanced_bulk_storage.wood.description",
+  "category": "advanced",
+  "icon": "minecraft:spruce_log",
+  "expression": "#minecraft:logs | #minecraft:planks",
+  "weight": 20,
+  "requirement": "any"
+}

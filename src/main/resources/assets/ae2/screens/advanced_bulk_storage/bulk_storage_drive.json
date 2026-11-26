@@ -1,0 +1,14 @@
+{
+  "includes": ["../common/common.json"],
+  "generatedBackground": { "width": 190, "height": 223 },
+  "helpTopic": "advanced_bulk_storage:bulk_storage_drive.md",
+  "slots": {
+    "MACHINE_INPUT": { "left": 8, "top": 21, "grid": "BREAK_AFTER_9COLS" },
+    "PLAYER_INVENTORY": { "left": 8, "bottom": 76, "grid": "BREAK_AFTER_9COLS" },
+    "PLAYER_HOTBAR": { "left": 8, "bottom": 18, "grid": "HORIZONTAL" }
+  },
+  "text": {
+    "dialog_title": { "position": { "left": 8, "top": 6 }, "maxWidth": 170 },
+    "player_inventory_title": { "text": { "translate": "container.inventory" }, "position": { "left": 8, "bottom": 87 } }
+  }
+}

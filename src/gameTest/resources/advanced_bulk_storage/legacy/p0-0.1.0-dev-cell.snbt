@@ -1,0 +1,17 @@
+{
+  id: "advanced_bulk_storage:tag_bulk_storage_cell",
+  count: 1,
+  components: {
+    "advanced_bulk_storage:cell_id": [I;-1911627767,-1039578784,-1895952547,-701850437],
+    "advanced_bulk_storage:contents": {
+      items: [
+        {amount:2147483648L,key:{components:{"minecraft:custom_name":'"Distinct stock"'},id:"minecraft:iron_ingot"}},
+        {amount:9223372036854775807L,key:{id:"minecraft:iron_ingot"}}
+      ],
+      version: 1
+    },
+    "advanced_bulk_storage:filter": {expression:"#c:ingots"},
+    "ae2:upgrades": [{item:{count:1,id:"advanced_bulk_storage:extended_tag_card"},slot:0}],
+    "minecraft:custom_name": '"Regression TAG"'
+  }
+}

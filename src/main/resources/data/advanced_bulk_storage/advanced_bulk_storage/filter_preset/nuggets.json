@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.nuggets",
+  "description": "preset.advanced_bulk_storage.nuggets.description",
+  "category": "basic",
+  "icon": "minecraft:iron_nugget",
+  "expression": "#c:nuggets",
+  "weight": 4,
+  "requirement": "any"
+}

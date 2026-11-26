@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.metals",
+  "description": "preset.advanced_bulk_storage.metals.description",
+  "category": "advanced",
+  "icon": "minecraft:gold_ingot",
+  "expression": "#c:ingots | #c:nuggets",
+  "weight": 18,
+  "requirement": "any"
+}

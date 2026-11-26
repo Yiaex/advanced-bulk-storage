@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.dusts",
+  "description": "preset.advanced_bulk_storage.dusts.description",
+  "category": "basic",
+  "icon": "minecraft:redstone",
+  "expression": "#c:dusts",
+  "weight": 3,
+  "requirement": "any"
+}

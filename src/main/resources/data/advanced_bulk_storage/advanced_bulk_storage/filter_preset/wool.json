@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.wool",
+  "description": "preset.advanced_bulk_storage.wool.description",
+  "category": "basic",
+  "icon": "minecraft:white_wool",
+  "expression": "#minecraft:wool",
+  "weight": 11,
+  "requirement": "any"
+}

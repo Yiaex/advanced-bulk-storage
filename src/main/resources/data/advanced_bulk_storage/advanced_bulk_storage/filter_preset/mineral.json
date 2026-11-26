@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.mineral",
+  "description": "preset.advanced_bulk_storage.mineral.description",
+  "category": "advanced",
+  "icon": "minecraft:diamond_ore",
+  "expression": "#c:ores | #c:raw_materials | #c:gems",
+  "weight": 17,
+  "requirement": "any"
+}

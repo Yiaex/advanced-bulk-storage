@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.storage_blocks",
+  "description": "preset.advanced_bulk_storage.storage_blocks.description",
+  "category": "basic",
+  "icon": "minecraft:iron_block",
+  "expression": "#c:storage_blocks",
+  "weight": 6,
+  "requirement": "any"
+}

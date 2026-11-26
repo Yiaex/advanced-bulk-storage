@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.ae2",
+  "description": "preset.advanced_bulk_storage.ae2.description",
+  "category": "advanced",
+  "icon": "minecraft:ender_pearl",
+  "expression": "@ae2",
+  "weight": 24,
+  "requirement": "any"
+}

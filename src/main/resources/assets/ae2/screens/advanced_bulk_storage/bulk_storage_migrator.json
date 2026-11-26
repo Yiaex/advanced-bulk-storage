@@ -1,0 +1,22 @@
+{
+  "includes": ["../common/common.json"],
+  "generatedBackground": { "width": 258, "height": 258 },
+  "helpTopic": "advanced_bulk_storage:bulk_storage_migrator.md",
+  "slots": {
+    "MACHINE_INPUT": { "left": 16, "top": 34 },
+    "UPGRADE": { "left": 121, "top": 34, "grid": "HORIZONTAL" },
+    "PLAYER_INVENTORY": { "left": 8, "bottom": 76, "grid": "BREAK_AFTER_9COLS" },
+    "PLAYER_HOTBAR": { "left": 8, "bottom": 18, "grid": "HORIZONTAL" }
+  },
+  "widgets": {
+    "migratorCellA": { "left": 16, "top": 34, "width": 16, "height": 16 },
+    "migratorCellB": { "left": 52, "top": 34, "width": 16, "height": 16 }
+  },
+  "text": {
+    "dialog_title": { "position": { "left": 8, "top": 6 }, "maxWidth": 242 },
+    "player_inventory_title": {
+      "text": { "translate": "container.inventory" },
+      "position": { "left": 8, "bottom": 87 }
+    }
+  }
+}

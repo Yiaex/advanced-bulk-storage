@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.gems",
+  "description": "preset.advanced_bulk_storage.gems.description",
+  "category": "basic",
+  "icon": "minecraft:diamond",
+  "expression": "#c:gems",
+  "weight": 5,
+  "requirement": "any"
+}

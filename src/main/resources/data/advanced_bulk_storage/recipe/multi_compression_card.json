@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "GPG",
+    "BCB",
+    "GPG"
+  ],
+  "key": {
+    "G": {
+      "item": "ae2:quartz_glass"
+    },
+    "P": {
+      "item": "megacells:accumulation_processor"
+    },
+    "B": {
+      "item": "minecraft:iron_block"
+    },
+    "C": {
+      "item": "ae2:advanced_card"
+    }
+  },
+  "result": {
+    "id": "advanced_bulk_storage:multi_compression_card",
+    "count": 1
+  }
+}

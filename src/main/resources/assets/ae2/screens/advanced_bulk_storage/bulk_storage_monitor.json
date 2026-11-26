@@ -1,0 +1,19 @@
+{
+  "includes": [
+    "../common/common.json"
+  ],
+  "generatedBackground": {
+    "width": 196,
+    "height": 122
+  },
+  "helpTopic": "advanced_bulk_storage:bulk_storage_monitor.md",
+  "text": {
+    "dialog_title": {
+      "position": {
+        "left": 8,
+        "top": 6
+      },
+      "maxWidth": 180
+    }
+  }
+}

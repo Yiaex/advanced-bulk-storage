@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "PCP",
+    "BIB",
+    "PCP"
+  ],
+  "key": {
+    "P": {
+      "item": "megacells:accumulation_processor"
+    },
+    "I": {
+      "item": "advanced_bulk_storage:bulk_storage_migrator"
+    },
+    "C": {
+      "item": "ae2:speed_card"
+    },
+    "B": {
+      "item": "minecraft:gold_block"
+    }
+  },
+  "result": {
+    "id": "advanced_bulk_storage:overclocked_bulk_storage_migrator",
+    "count": 1
+  }
+}

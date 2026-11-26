@@ -1,0 +1,25 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "type": "neoforge:components",
+      "items": "megacells:bulk_item_cell",
+      "components": {},
+      "strict": true
+    },
+    {
+      "item": "ae2:logic_processor"
+    },
+    {
+      "item": "ae2:engineering_processor"
+    },
+    {
+      "item": "megacells:cell_component_64m"
+    }
+  ],
+  "result": {
+    "id": "advanced_bulk_storage:tag_bulk_storage_cell",
+    "count": 1
+  }
+}

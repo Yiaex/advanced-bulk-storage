@@ -1,0 +1,7 @@
+{
+  "required": true,
+  "package": "dev.advancedbulkstorage.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": ["IoPortRemainderMixin", "NetworkCountMixin", "DriveCellIndexMixin", "BulkSmithingPatternMixin"],
+  "injectors": { "defaultRequire": 1 }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.planks",
+  "description": "preset.advanced_bulk_storage.planks.description",
+  "category": "basic",
+  "icon": "minecraft:oak_planks",
+  "expression": "#minecraft:planks",
+  "weight": 8,
+  "requirement": "any"
+}

@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/orientable",
+  "textures": {
+    "side": "advanced_bulk_storage:block/backplane",
+    "top": "advanced_bulk_storage:block/backplane",
+    "front": "advanced_bulk_storage:block/bulk_storage_manager"
+  }
+}

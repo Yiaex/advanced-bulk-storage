@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "GPG",
+    "MCM",
+    "GPG"
+  ],
+  "key": {
+    "G": {
+      "item": "ae2:quartz_glass"
+    },
+    "P": {
+      "item": "ae2:engineering_processor"
+    },
+    "M": {
+      "item": "minecraft:comparator"
+    },
+    "C": {
+      "item": "ae2:advanced_card"
+    }
+  },
+  "result": {
+    "id": "advanced_bulk_storage:storage_limit_card",
+    "count": 1
+  }
+}

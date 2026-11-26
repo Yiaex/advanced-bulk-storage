@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.products",
+  "description": "preset.advanced_bulk_storage.products.description",
+  "category": "advanced",
+  "icon": "minecraft:emerald",
+  "expression": "#c:ingots | #c:dusts | #c:gems",
+  "weight": 19,
+  "requirement": "any"
+}

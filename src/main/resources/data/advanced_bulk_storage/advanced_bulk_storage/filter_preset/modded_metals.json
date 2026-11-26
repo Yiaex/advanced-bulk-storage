@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.modded_metals",
+  "description": "preset.advanced_bulk_storage.modded_metals.description",
+  "category": "advanced",
+  "icon": "minecraft:netherite_ingot",
+  "expression": "#c:ingots & !@minecraft",
+  "weight": 22,
+  "requirement": "full"
+}

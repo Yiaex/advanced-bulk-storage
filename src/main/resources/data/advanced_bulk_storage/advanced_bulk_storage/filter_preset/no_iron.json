@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.no_iron",
+  "description": "preset.advanced_bulk_storage.no_iron.description",
+  "category": "advanced",
+  "icon": "minecraft:copper_ingot",
+  "expression": "#c:ingots & !#c:ingots/iron",
+  "weight": 23,
+  "requirement": "any"
+}

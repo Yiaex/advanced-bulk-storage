@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.cobblestones",
+  "description": "preset.advanced_bulk_storage.cobblestones.description",
+  "category": "basic",
+  "icon": "minecraft:cobblestone",
+  "expression": "#c:cobblestones",
+  "weight": 13,
+  "requirement": "any"
+}

@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.crops",
+  "description": "preset.advanced_bulk_storage.crops.description",
+  "category": "basic",
+  "icon": "minecraft:wheat",
+  "expression": "#c:crops",
+  "weight": 14,
+  "requirement": "any"
+}

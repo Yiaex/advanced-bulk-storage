@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.sands",
+  "description": "preset.advanced_bulk_storage.sands.description",
+  "category": "basic",
+  "icon": "minecraft:sand",
+  "expression": "#c:sands",
+  "weight": 12,
+  "requirement": "any"
+}

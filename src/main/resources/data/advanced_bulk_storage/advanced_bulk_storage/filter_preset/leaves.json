@@ -1,0 +1,9 @@
+{
+  "name": "preset.advanced_bulk_storage.leaves",
+  "description": "preset.advanced_bulk_storage.leaves.description",
+  "category": "basic",
+  "icon": "minecraft:oak_leaves",
+  "expression": "#minecraft:leaves",
+  "weight": 9,
+  "requirement": "any"
+}
