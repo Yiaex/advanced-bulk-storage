@@ -48,7 +48,7 @@ final class DriveAutoSort implements BulkScheduler.Job {
             var inventory = mount.inventory();
             BulkCellInventory.StockListener listener = (key, change) -> {
                 if (!applying) {
-                    if (change < 0 && inventory.autoSortRate() > 0) {
+                    if (change.signum() < 0 && inventory.autoSortRate() > 0) {
                         // Freeing capacity can unblock a previously visited key. Finish the
                         // current pass before revisiting it, even if extraction continues.
                         rescanRequested = true;

@@ -71,6 +71,7 @@ public record LimitProfile(long each, long total, boolean voidEach, boolean void
     }
 
     static final class Ledger {
+        static final long UNLIMITED = -1;
         final LimitProfile profile;
         private final BigInteger[] groups;
         private BigInteger total = BigInteger.ZERO;
@@ -84,14 +85,13 @@ public record LimitProfile(long each, long total, boolean voidEach, boolean void
             java.util.Arrays.fill(groups, BigInteger.ZERO);
         }
 
-        void change(AEItemKey key, long delta) {
-            if (!profile.valid || delta == 0) {
+        void change(AEItemKey key, BigInteger delta) {
+            if (!profile.valid || delta.signum() == 0) {
                 return;
             }
-            var value = BigInteger.valueOf(delta);
             if (eachCounts != null && profile.each > 0) {
                 var previous = eachCounts.getOrDefault(key, BigInteger.ZERO);
-                var current = previous.add(value);
+                var current = previous.add(delta);
                 if (current.signum() == 0) eachCounts.remove(key);
                 else eachCounts.put(key, current);
                 var cap = BigInteger.valueOf(profile.each);
@@ -99,24 +99,13 @@ public record LimitProfile(long each, long total, boolean voidEach, boolean void
                 if (current.compareTo(cap) >= 0) fullKeys++;
             }
             if (profile.total >= 0) {
-                total = total.add(value);
+                total = total.add(delta);
             }
             for (int index = 0; index < groups.length; index++) {
                 if (profile.rules.get(index).filter().matches(key)) {
-                    groups[index] = groups[index].add(value);
+                    groups[index] = groups[index].add(delta);
                 }
             }
-        }
-
-        long remaining(AEItemKey key, long stored) {
-            long available = profile.valid ? Long.MAX_VALUE : 0;
-            if (profile.each >= 0) available = Math.min(available, Math.max(0, profile.each - stored));
-            if (profile.total >= 0) available = Math.min(available, remaining(profile.total, total));
-            for (int i = 0; i < groups.length; i++) {
-                var rule = profile.rules.get(i);
-                if (rule.filter().matches(key)) available = Math.min(available, remaining(rule.maximum(), groups[i]));
-            }
-            return available;
         }
 
         boolean atLimit() {
@@ -127,29 +116,33 @@ public record LimitProfile(long each, long total, boolean voidEach, boolean void
             return false;
         }
 
-        long remaining(AEItemKey key, long stored, boolean discardRules) {
+        long remaining(AEItemKey key, BigInteger stored, boolean applyRefusing, boolean applyDiscarding) {
             if (!profile.valid) {
                 return 0;
             }
-            long result = profile.each < 0 || profile.voidEach != discardRules
-                    ? Long.MAX_VALUE : Math.max(0, profile.each - stored);
-            if (profile.total >= 0 && profile.voidTotal == discardRules) {
-                result = Math.min(result, remaining(profile.total, total));
+            long result = UNLIMITED;
+            if (profile.each >= 0 && (profile.voidEach ? applyDiscarding : applyRefusing)) {
+                result = remaining(profile.each, stored);
+            }
+            if (profile.total >= 0 && (profile.voidTotal ? applyDiscarding : applyRefusing)) {
+                result = minimum(result, remaining(profile.total, total));
             }
             for (int index = 0; index < groups.length; index++) {
                 var rule = profile.rules.get(index);
-                if (rule.discard() == discardRules && rule.filter().matches(key)) {
-                    result = Math.min(result, remaining(rule.maximum(), groups[index]));
+                if ((rule.discard() ? applyDiscarding : applyRefusing) && rule.filter().matches(key)) {
+                    result = minimum(result, remaining(rule.maximum(), groups[index]));
                 }
             }
             return result;
         }
 
-        private static long remaining(long cap, BigInteger count) {
-            if (count.signum() < 0 || count.bitLength() > 63) {
-                return 0;
-            }
-            return Math.max(0, cap - count.longValue());
+        static long minimum(long first, long second) {
+            if (first == UNLIMITED) return second;
+            return second == UNLIMITED ? first : Math.min(first, second);
+        }
+
+        static long remaining(long cap, BigInteger count) {
+            return count.signum() < 0 ? 0 : Math.max(0, cap - StockAmount.toLong(count));
         }
     }
 }

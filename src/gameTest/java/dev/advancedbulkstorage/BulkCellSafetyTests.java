@@ -14,6 +14,8 @@ import appeng.core.definitions.AEBlocks;
 import appeng.core.definitions.AEItems;
 import com.mojang.logging.LogUtils;
 import dev.advancedbulkstorage.filter.FilterConfig;
+import dev.advancedbulkstorage.storage.BulkCellInventory;
+import java.math.BigInteger;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -37,7 +39,8 @@ public final class BulkCellSafetyTests {
         test.setBlock(pos.east(2), AEBlocks.CREATIVE_ENERGY_CELL.block());
         var bulk = makeCell();
         var bulkStorage = StorageCells.getCellInventory(bulk, null);
-        test.assertTrue(bulkStorage.insert(key, Long.MAX_VALUE, REAL, SOURCE) == Long.MAX_VALUE, "Bulk fixture insert failed");
+        test.assertTrue(bulkStorage.insert(key, Long.MAX_VALUE, REAL, SOURCE) == Long.MAX_VALUE
+                && bulkStorage.insert(key, 29, REAL, SOURCE) == 29, "Wide stock fixture insert failed");
         var vanilla = AEItems.ITEM_CELL_1K.stack();
         var aeStorage = StorageCells.getCellInventory(vanilla, null);
         test.assertTrue(aeStorage.insert(key, 1, REAL, SOURCE) == 1, "Native fixture insert failed");
@@ -53,12 +56,20 @@ public final class BulkCellSafetyTests {
                     first.setPriority(0);
                     second.setPriority(100);
                     long low = network.getAvailableStacks().get(key);
-                    long bulkAfter = first.getOriginalCellInventory(0).getAvailableStacks().get(key);
+                    var physicalBulk = (BulkCellInventory) first.getOriginalCellInventory(0);
+                    var bulkAfter = physicalBulk.amountExact(key);
                     long aeAfter = second.getOriginalCellInventory(0).getAvailableStacks().get(key);
                     LogUtils.getLogger().info("ABS AUDIT mixed: bulkPriorityHigh={}, bulkPriorityLow={}, actualBulk={}, actualAE={}",
                             high, low, bulkAfter, aeAfter);
-                    test.assertTrue(high == Long.MAX_VALUE && low == Long.MAX_VALUE && bulkAfter == Long.MAX_VALUE && aeAfter == 1,
+                    test.assertTrue(high == Long.MAX_VALUE && low == Long.MAX_VALUE
+                                    && bulkAfter.equals(BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.valueOf(29))) && aeAfter == 1,
                             "Mixed AE2 counts wrapped or changed physical stock");
+                    first.setPriority(100);
+                    second.setPriority(0);
+                    long moved = network.extract(key, Long.MAX_VALUE, REAL, SOURCE);
+                    long remainder = network.getAvailableStacks().get(key);
+                    test.assertTrue(moved == Long.MAX_VALUE && remainder == 30,
+                            "Wide AE2 withdrawal did not conserve stock. Moved: " + moved + "; remaining: " + remainder);
                 }).thenSucceed();
     }
 

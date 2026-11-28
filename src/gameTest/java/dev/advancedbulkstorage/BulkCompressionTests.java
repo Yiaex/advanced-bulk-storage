@@ -13,6 +13,7 @@ import dev.advancedbulkstorage.storage.BulkCellInventory;
 import dev.advancedbulkstorage.storage.BulkCellItem;
 import dev.advancedbulkstorage.storage.BulkInventoryPreview;
 import dev.advancedbulkstorage.storage.CellTransfer;
+import java.math.BigInteger;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.core.BlockPos;
@@ -131,22 +132,69 @@ public final class BulkCompressionTests {
         var toStack = make("minecraft:iron_ingot");
         var from = open(fromStack);
         var to = open(toStack);
-        test.assertTrue(from.insert(INGOT, Long.MAX_VALUE, REAL, SOURCE) == Long.MAX_VALUE / 9
-                && from.insert(INGOT, 1, REAL, SOURCE) == 0, "LONG conversion silently truncated or overflowed");
-        long before = from.amount(NUGGET);
+        test.assertTrue(from.insert(INGOT, Long.MAX_VALUE, REAL, SOURCE) == Long.MAX_VALUE
+                && from.insert(INGOT, 1, REAL, SOURCE) == 1, "Compression rejected a quantity beyond LONG");
+        var before = BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.ONE).multiply(BigInteger.valueOf(9));
+        test.assertTrue(from.amountExact(NUGGET).equals(before) && from.amount(NUGGET) == Long.MAX_VALUE,
+                "The compression factor overflowed on insertion");
         var batch = CellTransfer.begin(fromStack, from, toStack, to);
         test.assertTrue(batch != null && batch.move(INGOT, Integer.MAX_VALUE) == Integer.MAX_VALUE,
                 "INT-scale staged migration with compressed cells failed");
-        test.assertTrue(from.amount(NUGGET) == before && to.amount(NUGGET) == 0, "Staged mutations reached the original pools");
+        test.assertTrue(from.amountExact(NUGGET).equals(before) && to.amount(NUGGET) == 0,
+                "Staged mutations reached the original pools");
         test.assertTrue(batch.commit((source, target) -> {
             var afterSource = open(source);
             var afterTarget = open(target);
             long moved = (long) Integer.MAX_VALUE * 9;
-            test.assertTrue(afterSource.amount(NUGGET) == before - moved && afterTarget.amount(NUGGET) == moved,
+            test.assertTrue(afterSource.amountExact(NUGGET).add(afterTarget.amountExact(NUGGET)).equals(before)
+                    && afterTarget.amount(NUGGET) == moved,
                     "Compressed migration lost base units");
             test.assertTrue(afterTarget.extract(BLOCK, 1, REAL, SOURCE) == 1 && afterTarget.amount(NUGGET) == moved - 81,
                     "Alternative withdrawal after migration debited the wrong pool");
         }), "Compressed staged pair never installed");
+        test.succeed();
+    }
+
+    @GameTest(template = "empty")
+    public static void widePoolsKeepExactDeltasAndHonorExplicitLongLimits(GameTestHelper test) {
+        var stack = make("minecraft:iron_ingot");
+        ((BulkCellItem) stack.getItem()).getUpgrades(stack)
+                .setItemDirect(1, BulkStorageMod.STORAGE_LIMIT_CARD.get().getDefaultInstance());
+        var cell = open(stack);
+        test.assertTrue(cell.insert(INGOT, 1, REAL, SOURCE) == 1, "Could not seed a legacy pool");
+        var narrow = stack.get(BulkStorageMod.CONTENTS).copyTag();
+        test.assertTrue(narrow.getInt("version") == 2 && narrow.getList("pools", Tag.TAG_COMPOUND).getCompound(0)
+                .getLong("units") == 9 && open(stack.copy()).amountExact(NUGGET).equals(BigInteger.valueOf(9)),
+                "A legacy-format pool did not round trip");
+        stack.set(BulkStorageMod.LIMITS, Long.MAX_VALUE + " total");
+        test.assertTrue(cell.insert(INGOT, Long.MAX_VALUE, SIM, SOURCE) == (Long.MAX_VALUE - 9) / 9,
+                "An explicit Long.MAX_VALUE limit was confused with unlimited headroom");
+        stack.set(BulkStorageMod.LIMITS, "1 minecraft:gold_ingot");
+        var changes = new java.util.ArrayList<BigInteger>();
+        BulkCellInventory.StockListener listener = (key, delta) -> {
+            test.assertTrue(key.equals(NUGGET), "The observer received a virtual compression form");
+            changes.add(delta);
+        };
+        cell.addStockMonitor(listener);
+        var delta = BigInteger.valueOf(Long.MAX_VALUE).multiply(BigInteger.valueOf(9));
+        test.assertTrue(cell.insert(INGOT, Long.MAX_VALUE, REAL, SOURCE) == Long.MAX_VALUE,
+                "An unmatched limit blocked a large compressed batch");
+        var expected = delta.add(BigInteger.valueOf(9));
+        var decoded = BulkCellNetworkTests.roundTrip(test, ItemStack.STREAM_CODEC, stack);
+        var ops = RegistryOps.create(NbtOps.INSTANCE, test.getLevel().registryAccess());
+        test.assertTrue(open(decoded).amountExact(NUGGET).equals(expected)
+                && BulkInventoryPreview.read(decoded.get(BulkStorageMod.CONTENTS), ops)
+                    .entries().getFirst().exactAmount().equals(expected)
+                && BulkInventoryPreview.decodeRemote(BulkStorageTests.collectRemotePreview(cell), ops)
+                    .entries().getFirst().exactAmount().equals(expected), "A wide pool changed over the wire");
+        stack.set(BulkStorageMod.LIMITS, "10 each; 10 total; 10 minecraft:iron_nugget");
+        test.assertTrue(cell.atConfiguredLimit() && cell.insert(INGOT, 1, SIM, SOURCE) == 0,
+                "New limits failed to account for the exact pool amount");
+        test.assertTrue(cell.extract(INGOT, Long.MAX_VALUE, REAL, SOURCE) == Long.MAX_VALUE
+                && cell.amount(NUGGET) == 9 && !cell.atConfiguredLimit()
+                && cell.insert(INGOT, 1, SIM, SOURCE) == 0 && changes.equals(java.util.List.of(delta, delta.negate())),
+                "An exact extraction, quota update or observer was off by part of a compressed batch");
+        cell.removeStockMonitor(listener);
         test.succeed();
     }
 

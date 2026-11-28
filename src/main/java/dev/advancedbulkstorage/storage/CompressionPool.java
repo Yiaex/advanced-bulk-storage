@@ -2,6 +2,7 @@ package dev.advancedbulkstorage.storage;
 
 import appeng.api.stacks.AEItemKey;
 import com.mojang.serialization.DynamicOps;
+import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -10,9 +11,9 @@ import org.jetbrains.annotations.Nullable;
 
 final class CompressionPool {
     final CompressionCatalog.Chain chain;
-    long units;
+    BigInteger units;
 
-    CompressionPool(CompressionCatalog.Chain chain, long units) {
+    CompressionPool(CompressionCatalog.Chain chain, BigInteger units) {
         this.chain = chain;
         this.units = units;
     }
@@ -22,9 +23,8 @@ final class CompressionPool {
                 : enabled && chain.equals(CompressionCatalog.lookup(chain.base())) ? chain.factor(key) : 0;
     }
 
-    CompoundTag encode(DynamicOps<Tag> ops) {
-        var record = new CompoundTag();
-        record.putLong("units", units);
+    boolean encode(CompoundTag record, DynamicOps<Tag> ops) {
+        boolean wide = StockAmount.write(record, "units", units);
         record.put("base", AEItemKey.CODEC.encodeStart(ops, chain.base()).getOrThrow());
         var forms = new ListTag();
         chain.factors().forEach((key, factor) -> {
@@ -34,11 +34,12 @@ final class CompressionPool {
             forms.add(form);
         });
         record.put("forms", forms);
-        return record;
+        return wide;
     }
 
-    static @Nullable CompressionPool decode(CompoundTag record, DynamicOps<Tag> ops) {
-        if (!record.contains("units", Tag.TAG_LONG) || record.getLong("units") <= 0
+    static @Nullable CompressionPool decode(CompoundTag record, DynamicOps<Tag> ops, boolean wideFormat) {
+        var units = StockAmount.read(record, "units", wideFormat);
+        if (units == null
                 || !(record.get("forms") instanceof ListTag list) || list.size() < 2
                 || list.size() > CompressionCatalog.MAX_FORMS || list.getElementType() != Tag.TAG_COMPOUND) {
             return null;
@@ -58,6 +59,6 @@ final class CompressionPool {
                 || new java.util.HashSet<>(factors.values()).size() != factors.size()) {
             return null;
         }
-        return new CompressionPool(new CompressionCatalog.Chain(base, factors), record.getLong("units"));
+        return new CompressionPool(new CompressionCatalog.Chain(base, factors), units);
     }
 }

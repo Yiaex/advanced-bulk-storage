@@ -20,6 +20,7 @@ import dev.advancedbulkstorage.storage.BulkCellItem;
 import dev.advancedbulkstorage.storage.BulkInventoryPreview;
 import dev.advancedbulkstorage.storage.BulkInventoryTooltip;
 import gripe._90.megacells.definition.MEGAItems;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -51,7 +52,7 @@ public final class BulkStorageTests {
     private BulkStorageTests() {}
 
     @GameTest(template = "empty")
-    public static void longAmountsAndPersistence(GameTestHelper test) {
+    public static void wideAmountsAndPersistence(GameTestHelper test) {
         var stack = cell(CellTier.QUANTUM, "@minecraft");
         var changes = new AtomicInteger();
         var inventory = open(stack, changes::incrementAndGet);
@@ -60,18 +61,24 @@ public final class BulkStorageTests {
         test.assertTrue(inventory.insert(iron, Long.MAX_VALUE, SIM, SOURCE) == Long.MAX_VALUE, "Simulation rejected capacity");
         test.assertTrue(changes.get() == 0 && inventory.amount(iron) == 0, "Simulation mutated inventory");
         test.assertTrue(inventory.insert(iron, Long.MAX_VALUE - 3, REAL, SOURCE) == Long.MAX_VALUE - 3, "Large insert failed");
-        test.assertTrue(inventory.insert(iron, 10, REAL, SOURCE) == 3, "Overflow was not rejected");
+        test.assertTrue(inventory.insert(iron, 10, REAL, SOURCE) == 10, "Insertion stopped at Long.MAX_VALUE");
         test.assertTrue(inventory.insert(gold, 1_000_000_000_000L, REAL, SOURCE) == 1_000_000_000_000L, "Independent insert failed");
         test.assertTrue(!stack.has(BulkStorageMod.CONTENTS) && changes.get() == 3, "Write-back was not deferred");
         inventory.persist();
         var saved = stack.save(test.getLevel().registryAccess());
         var restored = ItemStack.parse(test.getLevel().registryAccess(), saved).orElseThrow();
         var loaded = open(restored, null);
+        var expected = BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.valueOf(7));
         test.assertTrue(inventory.id() != null && inventory.id().equals(loaded.id()), "UUID changed after serialization");
-        test.assertTrue(loaded.amount(iron) == Long.MAX_VALUE && loaded.amount(gold) == 1_000_000_000_000L, "Amounts changed on load");
-        test.assertTrue(loaded.extract(iron, Long.MAX_VALUE, SIM, SOURCE) == Long.MAX_VALUE && loaded.amount(iron) == Long.MAX_VALUE,
+        test.assertTrue(loaded.amountExact(iron).equals(expected) && loaded.amount(iron) == Long.MAX_VALUE
+                && loaded.amount(gold) == 1_000_000_000_000L, "Amounts changed on load");
+        test.assertTrue(loaded.extract(iron, Long.MAX_VALUE, SIM, SOURCE) == Long.MAX_VALUE
+                && loaded.amountExact(iron).equals(expected),
                 "Extraction simulation modified inventory");
-        test.assertTrue(loaded.extract(iron, Long.MAX_VALUE, REAL, SOURCE) == Long.MAX_VALUE, "Full withdrawal failed");
+        test.assertTrue(loaded.extract(iron, Long.MAX_VALUE, REAL, SOURCE) == Long.MAX_VALUE && loaded.amount(iron) == 7,
+                "Withdrawal lost the units beyond the signed long range");
+        test.assertTrue(restored.get(BulkStorageMod.CONTENTS).copyTag().getInt("version") == 1,
+                "Narrow ordinary stock no longer used the legacy format");
         test.assertTrue(loaded.insert(gold, -1, REAL, SOURCE) == 0 && loaded.extract(gold, -1, REAL, SOURCE) == 0,
                 "Rejected quantities changed the inventory");
         var counter = new KeyCounter();
@@ -114,11 +121,12 @@ public final class BulkStorageTests {
                 firstWire.getBytes(java.nio.charset.StandardCharsets.UTF_8).length, remote.entries().size(),
                 System.nanoTime() - started);
         test.assertTrue(remote.equals(preview) && firstWire.length() < 24_000, "Remote preview sent the wrong stock or exceeded its bound");
-        loaded.insert(namedKey(0), Long.MAX_VALUE - 1, REAL, SOURCE);
+        loaded.insert(namedKey(0), Long.MAX_VALUE, REAL, SOURCE);
         test.assertTrue(loaded.readyPreview() == null, "Inventory mutation did not invalidate the preview");
         var revised = BulkInventoryPreview.decodeRemote(collectRemotePreview(loaded), ops);
         test.assertTrue(revised.total() == 4096 && revised.entries().getFirst().key().equals(namedKey(0))
                 && revised.entries().getFirst().amount() == Long.MAX_VALUE
+                && revised.entries().getFirst().exactAmount().equals(BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.ONE))
                 && revised.entries().getFirst().label().equals("9.2E"), "Live changes did not refresh the shared preview");
         test.succeed();
     }
@@ -304,6 +312,19 @@ public final class BulkStorageTests {
                 "Unsupported payload was writable");
         inventory.persist();
         test.assertTrue(stack.get(BulkStorageMod.CONTENTS).copyTag().equals(data), "Unsupported payload was overridden");
+        var wide = cell(CellTier.QUANTUM, "@minecraft");
+        var wideInventory = open(wide, null);
+        wideInventory.insert(iron, Long.MAX_VALUE, REAL, SOURCE);
+        wideInventory.insert(iron, 1, REAL, SOURCE);
+        var invalid = wide.get(BulkStorageMod.CONTENTS).copyTag();
+        invalid.getList("items", net.minecraft.nbt.Tag.TAG_COMPOUND).getCompound(0)
+                .putByteArray("amount", new byte[] {-1});
+        wide.set(BulkStorageMod.CONTENTS, CustomData.of(invalid));
+        var quarantined = open(wide, null);
+        test.assertTrue(quarantined.quarantined() && quarantined.extract(iron, 1, REAL, SOURCE) == 0
+                && quarantined.insert(iron, 1, REAL, SOURCE) == 0
+                && wide.get(BulkStorageMod.CONTENTS).copyTag().equals(invalid),
+                "An invalid wide amount was accepted or its original data was overwritten");
         test.succeed();
     }
 

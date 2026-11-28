@@ -2,6 +2,7 @@ package dev.advancedbulkstorage.storage;
 
 import appeng.api.stacks.AEItemKey;
 import com.mojang.serialization.DynamicOps;
+import java.math.BigInteger;
 import java.util.Comparator;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,7 +19,7 @@ public record BulkInventoryPreview(int total, List<Entry> entries, boolean inval
     public static final BulkInventoryPreview EMPTY = new BulkInventoryPreview(0, List.of(), false);
     public static final BulkInventoryPreview INVALID = new BulkInventoryPreview(0, List.of(), true);
     private static final String[] UNITS = {"", "K", "M", "G", "T", "P", "E"};
-    private static final Comparator<EncodedEntry> ORDER = Comparator.comparingLong(EncodedEntry::amount).reversed()
+    private static final Comparator<EncodedEntry> ORDER = Comparator.comparing(EncodedEntry::amount).reversed()
             .thenComparing(EncodedEntry::id)
             .thenComparingInt(entry -> entry.key().hashCode())
             .thenComparing(entry -> entry.key().toString());
@@ -27,19 +28,21 @@ public record BulkInventoryPreview(int total, List<Entry> entries, boolean inval
         entries = List.copyOf(entries);
     }
 
-    public record Entry(AEItemKey key, long amount, String label, boolean pool) {}
+    public record Entry(AEItemKey key, BigInteger exactAmount, String label, boolean pool) {
+        public long amount() { return StockAmount.toLong(exactAmount); }
+    }
 
     static final class Selection {
-        private record Candidate(AEItemKey key, long amount, boolean pool) {}
+        private record Candidate(AEItemKey key, BigInteger amount, boolean pool) {}
 
-        private static final Comparator<Candidate> BY_AMOUNT = Comparator.comparingLong(Candidate::amount).reversed()
+        private static final Comparator<Candidate> BY_AMOUNT = Comparator.comparing(Candidate::amount).reversed()
                 .thenComparing(row -> row.key().getId())
                 .thenComparingInt(row -> row.key().hashCode())
                 .thenComparing(Candidate::pool);
         private final PriorityQueue<Candidate> entries = new PriorityQueue<>(MAX_ENTRIES, BY_AMOUNT.reversed());
 
-        void add(AEItemKey key, long amount, boolean pool) {
-            if (entries.size() == MAX_ENTRIES && amount < entries.element().amount()) {
+        void add(AEItemKey key, BigInteger amount, boolean pool) {
+            if (entries.size() == MAX_ENTRIES && amount.compareTo(entries.element().amount()) < 0) {
                 return;
             }
             var row = new Candidate(key, amount, pool);
@@ -74,9 +77,12 @@ public record BulkInventoryPreview(int total, List<Entry> entries, boolean inval
                 return;
             }
             String key = encoded.toString();
-            if (wire.length() + key.length() + 32 <= MAX_REMOTE_CHARS) {
+            int room = MAX_REMOTE_CHARS - wire.length() - key.length() - 12;
+            if (room <= 0 || entry.exactAmount().bitLength() > 4L * room) return;
+            String amount = entry.exactAmount().toString();
+            if (amount.length() <= room) {
                 // SNBT escapes newlines only according to its own rules, so frame by character length.
-                wire.append(';').append(entry.pool() ? 'p' : 'i').append(entry.amount())
+                wire.append(';').append(entry.pool() ? 'p' : 'i').append(amount)
                         .append(';').append(key.length()).append(';').append(key);
             }
         }
@@ -104,10 +110,10 @@ public record BulkInventoryPreview(int total, List<Entry> entries, boolean inval
                 int start = cursor + 1;
                 int next = wire.indexOf(';', start);
                 boolean pool = wire.charAt(start) == 'p';
-                long amount = Long.parseLong(wire.substring(start + 1, next));
+                var amount = new BigInteger(wire.substring(start + 1, next));
                 int keyStart = wire.indexOf(';', next + 1) + 1;
                 int length = Integer.parseInt(wire.substring(next + 1, keyStart - 1));
-                if (length <= 0 || length > wire.length() - keyStart || amount <= 0) {
+                if (length <= 0 || length > wire.length() - keyStart || amount.signum() <= 0) {
                     return INVALID;
                 }
                 int end = keyStart + length;
@@ -131,7 +137,7 @@ public record BulkInventoryPreview(int total, List<Entry> entries, boolean inval
         return Math.min(entries.size(), Math.min(limit, columns * rows));
     }
 
-    private record EncodedEntry(String id, CompoundTag key, long amount, boolean pool) {}
+    private record EncodedEntry(String id, CompoundTag key, BigInteger amount, boolean pool) {}
 
     @SuppressWarnings("deprecation")
     public static BulkInventoryPreview read(CustomData data, DynamicOps<Tag> ops) {
@@ -141,16 +147,21 @@ public record BulkInventoryPreview(int total, List<Entry> entries, boolean inval
         var contents = data.getUnsafe();
         int version = contents.getInt("version");
         if (!contents.contains("version", Tag.TAG_INT)
-                || version != BulkCellInventory.DATA_VERSION && version != BulkCellInventory.POOL_VERSION) {
+                || version < BulkCellInventory.DATA_VERSION || version > BulkCellInventory.WIDE_VERSION) {
             return new BulkInventoryPreview(0, List.of(), true);
         }
         if (!(contents.get("items") instanceof net.minecraft.nbt.ListTag rows)
                 || !rows.isEmpty() && rows.getElementType() != Tag.TAG_COMPOUND) {
             return new BulkInventoryPreview(0, List.of(), true);
         }
-        var pools = contents.getList("pools", Tag.TAG_COMPOUND);
-        if (version == BulkCellInventory.POOL_VERSION && pools.isEmpty()) {
-            return new BulkInventoryPreview(0, List.of(), true);
+        var pools = new net.minecraft.nbt.ListTag();
+        boolean wide = version == BulkCellInventory.WIDE_VERSION;
+        if (version == BulkCellInventory.POOL_VERSION || wide && contents.contains("pools")) {
+            if (!(contents.get("pools") instanceof net.minecraft.nbt.ListTag list)
+                    || list.isEmpty() || list.getElementType() != Tag.TAG_COMPOUND) {
+                return INVALID;
+            }
+            pools = list;
         }
         int total = rows.size() + pools.size();
         var largest = new PriorityQueue<EncodedEntry>(MAX_ENTRIES, ORDER.reversed());
@@ -159,11 +170,11 @@ public record BulkInventoryPreview(int total, List<Entry> entries, boolean inval
             var row = pool ? pools.getCompound(index - rows.size()) : rows.getCompound(index);
             String quantity = pool ? "units" : "amount";
             String item = pool ? "base" : "key";
-            long amount = row.getLong(quantity);
-            if (amount <= 0 || !row.contains(quantity, Tag.TAG_LONG) || !row.contains(item, Tag.TAG_COMPOUND)) {
+            var amount = StockAmount.read(row, quantity, wide);
+            if (amount == null || !row.contains(item, Tag.TAG_COMPOUND)) {
                 return new BulkInventoryPreview(total, List.of(), true);
             }
-            if (largest.size() == MAX_ENTRIES && amount < largest.element().amount()) {
+            if (largest.size() == MAX_ENTRIES && amount.compareTo(largest.element().amount()) < 0) {
                 continue;
             }
             var key = row.getCompound(item);
@@ -184,6 +195,21 @@ public record BulkInventoryPreview(int total, List<Entry> entries, boolean inval
             entries.add(new Entry(key, row.amount(), formatAmount(row.amount()), row.pool()));
         }
         return new BulkInventoryPreview(total, entries, false);
+    }
+
+    public static String formatAmount(BigInteger amount) {
+        if (amount.bitLength() <= 63) return formatAmount(amount.longValue());
+        // Keep the label narrow even for imported quantities with many digits.
+        if (amount.bitLength() > 1024) return StockAmount.display(amount);
+        String digits = amount.toString();
+        if (digits.length() <= 21) {
+            int wholeDigits = digits.length() - 18;
+            if (wholeDigits == 1 && digits.charAt(1) != '0') {
+                return digits.substring(0, 1) + "." + digits.charAt(1) + "E";
+            }
+            return digits.substring(0, wholeDigits) + "E";
+        }
+        return digits.substring(0, 1) + "." + digits.charAt(1) + "e" + (digits.length() - 1);
     }
 
     public static String formatAmount(long amount) {

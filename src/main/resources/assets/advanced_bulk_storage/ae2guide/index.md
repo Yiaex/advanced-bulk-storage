@@ -13,7 +13,7 @@ An Advanced Bulk Storage cell holds independent quantities for many item types. 
 3. Save the rule and install the cell in a powered AE2 drive. Use a storage terminal to send iron, gold and copper ingots to the network.
 4. Use the AE2 Cell Workbench to add an exact item partition or install an [Extended Tag Card](extended_tag_card.md).
 
-The default per-key quantity limit is 9,223,372,036,854,775,807.
+Cell quantities use arbitrary-precision integers. AE2 counts and per-call transfers are bounded by the signed long range.
 
 - [Storage Cells and Tier Upgrades](storage_cells.md)
 - [Storage Interfaces](storage_interfaces.md)

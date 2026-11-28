@@ -14,6 +14,9 @@ import dev.advancedbulkstorage.filter.FilterConfig;
 import dev.advancedbulkstorage.filter.FilterEngine;
 import dev.advancedbulkstorage.filter.FilterPresets;
 import dev.advancedbulkstorage.storage.BulkCellInventory;
+import dev.advancedbulkstorage.storage.BulkInventoryPreview;
+import dev.advancedbulkstorage.storage.StockAmount;
+import java.math.BigInteger;
 import dev.advancedbulkstorage.storage.BulkCellItem;
 import dev.advancedbulkstorage.storage.LimitProfile;
 import java.util.ArrayList;
@@ -406,7 +409,7 @@ public final class FilterEditorMenu extends AEBaseMenu {
         String modId = token.substring(1);
         String name = ModList.get().getModContainerById(modId)
                 .map(container -> container.getModInfo().getDisplayName()).orElse(modId);
-        return new Result(name + " (" + modId + ")", false, "", "", result.config(), result.error(), "mod_group", 0);
+        return new Result(name + " (" + modId + ")", false, "", "", result.config(), result.error(), "mod_group");
     }
 
     private static List<Result> itemTags(String requested, FilterCapabilities caps) {
@@ -445,7 +448,7 @@ public final class FilterEditorMenu extends AEBaseMenu {
             }
             if (caps.items()) {
                 var result = token(id.toString(), caps);
-                rows.addFirst(new Result(result.name(), false, "", id.toString(), result.config(), result.error(), "exact_item", 0));
+                rows.addFirst(new Result(result.name(), false, "", id.toString(), result.config(), result.error(), "exact_item"));
             }
             return rows.stream().limit(128).toList();
         }).orElseGet(List::of);
@@ -453,7 +456,7 @@ public final class FilterEditorMenu extends AEBaseMenu {
 
     private static Result tagResult(ResourceLocation id, FilterCapabilities caps, String section) {
         var result = token("#" + id, caps);
-        return new Result(result.name(), false, "", "", result.config(), result.error(), section, 0);
+        return new Result(result.name(), false, "", "", result.config(), result.error(), section);
     }
 
     private void publishStock(Query query, FilterCapabilities capabilities) {
@@ -470,10 +473,7 @@ public final class FilterEditorMenu extends AEBaseMenu {
         if (stockRevision != viewedInventory.revision()) {
             stockRevision = viewedInventory.revision();
             var snapshot = new ArrayList<StockEntry>();
-            for (var entry : viewedInventory.getAvailableStacks()) {
-                var key = (AEItemKey) entry.getKey();
-                snapshot.add(new StockEntry(key, entry.getLongValue(), key.getDisplayName().getString()));
-            }
+            viewedInventory.visitStock((key, amount) -> snapshot.add(new StockEntry(key, amount, key.getDisplayName().getString())));
             stockView = List.copyOf(snapshot);
             stockSearch = null;
             storedTypes = stockView.size();
@@ -490,7 +490,9 @@ public final class FilterEditorMenu extends AEBaseMenu {
         var compiled = FilterEngine.compile(stack.getOrDefault(BulkStorageMod.FILTER, FilterConfig.EMPTY), capabilities);
         var rows = matchingStock.subList(start, Math.min(start + PAGE_SIZE, matchingStock.size())).stream()
                 .map(entry -> new Result(abbreviate(entry.name()), false, "", entry.key().getId().toString(),
-                        FilterConfig.EMPTY, "", compiled.matches(entry.key()) ? "" : "stock_filtered", entry.amount()))
+                        FilterConfig.EMPTY, "", compiled.matches(entry.key()) ? "" : "stock_filtered",
+                        StockAmount.toLong(entry.amount()), entry.amount().bitLength() > 63 ? StockAmount.display(entry.amount()) : null,
+                        entry.amount().bitLength() > 63 ? BulkInventoryPreview.formatAmount(entry.amount()) : null))
                 .toList();
         publishResponse(new Response(page, matchingStock.size(), query.requestId(), "", rows));
     }
@@ -507,7 +509,7 @@ public final class FilterEditorMenu extends AEBaseMenu {
                         : term.startsWith("#") ? tag != null && entry.key().isTagged(tag)
                         : entry.name().toLowerCase(Locale.ROOT).contains(term)
                                 || entry.key().getId().toString().contains(term))
-                .sorted(quantityOrder ? Comparator.comparingLong(StockEntry::amount).reversed().thenComparing(order) : order)
+                .sorted(quantityOrder ? Comparator.comparing(StockEntry::amount).reversed().thenComparing(order) : order)
                 .toList();
     }
 
@@ -611,11 +613,16 @@ public final class FilterEditorMenu extends AEBaseMenu {
     public record Query(Mode mode, int page, String search, String item, FilterConfig expression, int requestId) {}
     public record Favorite(String name, FilterConfig config) {}
     public record Result(String name, boolean translated, String description, String icon, FilterConfig config, String error,
-                         String section, long amount) {
+                         String section, long amount, String wideAmount, String compactAmount) {
         public Result(String name, boolean translated, String description, String icon, FilterConfig config, String error) {
-            this(name, translated, description, icon, config, error, "", 0);
+            this(name, translated, description, icon, config, error, "");
+        }
+
+        public Result(String name, boolean translated, String description, String icon, FilterConfig config, String error,
+                      String section) {
+            this(name, translated, description, icon, config, error, section, 0, null, null);
         }
     }
-    private record StockEntry(AEItemKey key, long amount, String name) {}
+    private record StockEntry(AEItemKey key, BigInteger amount, String name) {}
     public record Response(int page, int total, int requestId, String info, List<Result> results) {}
 }

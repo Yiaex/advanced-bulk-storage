@@ -327,6 +327,10 @@ public final class BulkCellNetworkTests {
             if (inventory.insert(AEItemKey.of(stack), amount, Actionable.MODULATE, SOURCE) != amount) {
                 test.fail("Could not seed the 4096-key Quantum cell at row " + i);
             }
+            if (i % 2 == 0) {
+                test.assertTrue(inventory.insert(AEItemKey.of(stack), Long.MAX_VALUE, Actionable.MODULATE, SOURCE) == Long.MAX_VALUE,
+                        "Could not seed a wide quantity in the dense cell");
+            }
         }
         inventory.persist();
         return quantum;
@@ -423,6 +427,7 @@ public final class BulkCellNetworkTests {
         var named = new ItemStack(Items.IRON_INGOT);
         named.set(DataComponents.CUSTOM_NAME, Component.literal("Distinct stock"));
         if (cell.insert(plain, Long.MAX_VALUE, Actionable.MODULATE, SOURCE) != Long.MAX_VALUE
+                || cell.insert(plain, OVER_INT, Actionable.MODULATE, SOURCE) != OVER_INT
                 || cell.insert(AEItemKey.of(named), OVER_INT, Actionable.MODULATE, SOURCE) != OVER_INT) {
             throw new IllegalStateException("Could not seed non-empty " + tier + " test cell");
         }

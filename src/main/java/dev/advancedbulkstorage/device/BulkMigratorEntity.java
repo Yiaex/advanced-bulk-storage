@@ -27,6 +27,7 @@ import dev.advancedbulkstorage.menu.BulkFilterHost;
 import dev.advancedbulkstorage.storage.CellTransfer;
 import dev.advancedbulkstorage.storage.BulkCellIndex;
 import dev.advancedbulkstorage.storage.BulkCellInventory;
+import java.math.BigInteger;
 import java.util.ArrayDeque;
 import java.util.List;
 import java.util.UUID;
@@ -73,7 +74,7 @@ public final class BulkMigratorEntity extends AENetworkedInvBlockEntity implemen
     private final Set<BulkCellInventory> watchedDisks = new HashSet<>();
     private final BulkCellInventory.StockListener stockListener = (key, delta) -> remoteStockChanged();
     private boolean transferring;
-    private long remainingItems = -1;
+    private @Nullable BigInteger remainingItems;
     private Status status = Status.PAUSED;
     private FilterConfig rule = FilterConfig.EMPTY;
     private FilterEngine.Compiled filter;
@@ -97,7 +98,9 @@ public final class BulkMigratorEntity extends AENetworkedInvBlockEntity implemen
     public Scope scope() { return scope; }
     public Status status() { return status; }
     public int remainingKeys() { return pending.size(); }
-    public long remainingItems() { return remainingItems; }
+    public long remainingItems() {
+        return remainingItems == null || remainingItems.bitLength() > 63 ? -1 : remainingItems.longValue();
+    }
     public long totalMoved() { return totalMoved; }
     public long rate() { return tier().rate(upgrades.getInstalledUpgrades(AEItems.SPEED_CARD)); }
     public String expression() { return rule.expression(); }
@@ -216,7 +219,7 @@ public final class BulkMigratorEntity extends AENetworkedInvBlockEntity implemen
     private void resetWork() {
         rescan = true;
         routeRevision = -1;
-        remainingItems = -1;
+        remainingItems = null;
         saveChanges();
         wake();
     }
@@ -449,16 +452,11 @@ public final class BulkMigratorEntity extends AENetworkedInvBlockEntity implemen
                     pending.add(key);
                 }
             }
-            remainingItems = -1;
+            remainingItems = null;
             if (source instanceof BulkCellInventory bulk && bulk.compressionPools() == 0) {
-                long total = 0;
+                var total = BigInteger.ZERO;
                 for (var key : pending) {
-                    long amount = bulk.amount(key);
-                    if (amount > Long.MAX_VALUE - total) {
-                        total = -1;
-                        break;
-                    }
-                    total += amount;
+                    total = total.add(bulk.amountExact(key));
                 }
                 remainingItems = total;
             }
@@ -523,7 +521,7 @@ public final class BulkMigratorEntity extends AENetworkedInvBlockEntity implemen
                 power.extractAEPower(moved * unitPower, Actionable.MODULATE, PowerMultiplier.CONFIG);
             }
             totalMoved += Math.min(moved, Long.MAX_VALUE - totalMoved);
-            if (remainingItems >= 0) remainingItems = Math.max(0, remainingItems - moved);
+            if (remainingItems != null) remainingItems = remainingItems.subtract(BigInteger.valueOf(moved)).max(BigInteger.ZERO);
             lastMoved = moved;
             lastMoveTime = level.getGameTime();
             saveChanges();
@@ -537,7 +535,7 @@ public final class BulkMigratorEntity extends AENetworkedInvBlockEntity implemen
         blockedRoute |= current == null || current.getStatus() != CellState.EMPTY;
         ++routeIndex;
         rescan = true;
-        if (!blockedRoute) remainingItems = 0;
+        if (!blockedRoute) remainingItems = BigInteger.ZERO;
         if (scope == Scope.SLOT_TO_GRID && current != null && current.getStatus() == CellState.EMPTY) {
             return stop(Status.FINISHED);
         }

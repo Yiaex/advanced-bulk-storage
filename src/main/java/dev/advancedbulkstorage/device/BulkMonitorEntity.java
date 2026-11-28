@@ -232,8 +232,8 @@ public final class BulkMonitorEntity extends AENetworkedBlockEntity implements B
         return rule.expression().isBlank() || filter != null && filter.error() == null && filter.matches(key);
     }
 
-    private void onDiskChange(AEItemKey key, long difference) {
-        if (matchesDisk(key)) total = total.add(BigInteger.valueOf(difference));
+    private void onDiskChange(AEItemKey key, BigInteger difference) {
+        if (matchesDisk(key)) total = total.add(difference);
         diskChanged = true;
     }
 
@@ -273,7 +273,7 @@ public final class BulkMonitorEntity extends AENetworkedBlockEntity implements B
                 detachDisk();
                 total = BigInteger.ZERO;
                 inventory.visitPhysicalStock((key, amount, pool) -> {
-                    if (matchesDisk(key)) total = total.add(BigInteger.valueOf(amount));
+                    if (matchesDisk(key)) total = total.add(amount);
                 });
                 watchedDisk = inventory;
                 inventory.addStockMonitor(diskListener);

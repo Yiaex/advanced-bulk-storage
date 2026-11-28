@@ -28,10 +28,10 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 
 public final class FilterEditorScreen extends AEBaseScreen<FilterEditorMenu> {
+    private static final String[] QUANTITY_UNITS = {"", "K", "M", "G", "T", "P", "E"};
     private static final Gson JSON = new Gson();
     private static final int MAX_WIDTH = 344;
     private static final int MAX_HEIGHT = 268;
-    private static final String[] QUANTITY_UNITS = {"", "K", "M", "G", "T", "P", "E"};
     private final ArrayDeque<FilterConfig> undo = new ArrayDeque<>();
     private final AE2Button[] rows = new AE2Button[FilterEditorMenu.PAGE_SIZE];
     private final ItemStack[] rowIcons = new ItemStack[FilterEditorMenu.PAGE_SIZE];
@@ -413,7 +413,8 @@ public final class FilterEditorScreen extends AEBaseScreen<FilterEditorMenu> {
                 }
                 row.setMessage(label(result));
                 row.active = result.error().isEmpty();
-                Component tip = result.amount() > 0 ? Component.literal(result.name() + "\n" + result.amount())
+                var quantity = result.wideAmount() == null ? Long.toString(result.amount()) : result.wideAmount();
+                Component tip = result.amount() > 0 ? Component.literal(result.name() + "\n" + quantity)
                         : result.description().isEmpty() ? Component.literal(result.config().expression())
                         : Component.translatable(result.description()).append("\n").append(result.config().expression());
                 if (!result.section().isEmpty()) {
@@ -432,7 +433,8 @@ public final class FilterEditorScreen extends AEBaseScreen<FilterEditorMenu> {
         }
         var name = result.translated() ? Component.translatable(result.name()) : Component.literal(result.name());
         if (result.amount() > 0) {
-            return name.append("  × ").append(compactQuantity(result.amount()));
+            var quantity = result.compactAmount() == null ? compactQuantity(result.amount()) : result.compactAmount();
+            return name.append("  × ").append(quantity);
         }
         return result.section().isEmpty() ? name : text(result.section()).copy().append("  ").append(name);
     }

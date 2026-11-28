@@ -21,8 +21,9 @@ import dev.advancedbulkstorage.CellTier;
 import dev.advancedbulkstorage.migration.BulkScheduler;
 import dev.advancedbulkstorage.filter.FilterConfig;
 import dev.advancedbulkstorage.filter.FilterEngine;
-import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
-import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import java.math.BigInteger;
 import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.HashMap;
@@ -47,6 +48,7 @@ public final class BulkCellInventory implements StorageCell {
     private static final Logger LOGGER = LogUtils.getLogger();
     static final int DATA_VERSION = 1;
     static final int POOL_VERSION = 2;
+    static final int WIDE_VERSION = 3;
     private static final Cache<CustomData, Boolean> REPORTED_INVALID_CONTENTS = CacheBuilder.newBuilder()
             .weakKeys().maximumSize(256).build();
     // ItemStack uses identity equality. Values must never retain the stack or its host strongly.
@@ -59,7 +61,7 @@ public final class BulkCellInventory implements StorageCell {
     private final @Nullable ISaveProvider host;
     private final DynamicOps<Tag> ops;
     private final State state;
-    private final Object2LongOpenHashMap<AEItemKey> amounts;
+    private final Object2ObjectOpenHashMap<AEItemKey, BigInteger> amounts;
     private final Set<AEKey> partition;
     private FilterEngine.Compiled filter;
     private int filterGeneration = -1;
@@ -71,7 +73,7 @@ public final class BulkCellInventory implements StorageCell {
     private int autoRate;
 
     private static final class State {
-        final Object2LongOpenHashMap<AEItemKey> amounts = new Object2LongOpenHashMap<>();
+        final Object2ObjectOpenHashMap<AEItemKey, BigInteger> amounts = new Object2ObjectOpenHashMap<>();
         final LinkedHashMap<AEItemKey, CompressionPool> pools = new LinkedHashMap<>();
         final HashMap<AEItemKey, CompressionPool> poolByForm = new HashMap<>();
         CustomData persisted;
@@ -93,7 +95,7 @@ public final class BulkCellInventory implements StorageCell {
 
     @FunctionalInterface
     public interface StockListener {
-        void changed(AEItemKey key, long delta);
+        void changed(AEItemKey key, BigInteger delta);
     }
 
     void observeStock(@Nullable StockListener listener) {
@@ -158,7 +160,7 @@ public final class BulkCellInventory implements StorageCell {
             return;
         }
         int version = data.getInt("version");
-        if (!data.contains("version", Tag.TAG_INT) || version != DATA_VERSION && version != POOL_VERSION) {
+        if (!data.contains("version", Tag.TAG_INT) || version < DATA_VERSION || version > WIDE_VERSION) {
             quarantine(contents, "unsupported inventory version (found "
                     + data.get("version") + ")");
             return;
@@ -169,24 +171,24 @@ public final class BulkCellInventory implements StorageCell {
         }
         for (int i = 0; i < list.size(); i++) {
             var row = list.getCompound(i);
-            long amount = row.getLong("amount");
-            if (!row.contains("amount", Tag.TAG_LONG) || amount <= 0 || !row.contains("key", Tag.TAG_COMPOUND)) {
+            var amount = StockAmount.read(row, "amount", version == WIDE_VERSION);
+            if (amount == null || !row.contains("key", Tag.TAG_COMPOUND)) {
                 quarantine(contents, "invalid item or amount in inventory row " + i);
                 return;
             }
             var key = AEItemKey.CODEC.parse(ops, row.getCompound("key")).result().orElse(null);
-            if (key == null || amounts.putIfAbsent(key, amount) != 0) {
+            if (key == null || amounts.putIfAbsent(key, amount) != null) {
                 quarantine(contents, "unreadable or duplicate item key in inventory row " + i);
                 return;
             }
         }
-        if (version == POOL_VERSION) {
+        if (version == POOL_VERSION || version == WIDE_VERSION && data.contains("pools")) {
             if (!(data.get("pools") instanceof ListTag pools) || pools.isEmpty() || pools.getElementType() != Tag.TAG_COMPOUND) {
                 quarantine(contents, "missing compression pools");
                 return;
             }
             for (int index = 0; index < pools.size(); index++) {
-                var pool = CompressionPool.decode(pools.getCompound(index), ops);
+                var pool = CompressionPool.decode(pools.getCompound(index), ops, version == WIDE_VERSION);
                 if (pool == null || pool.chain.factors().keySet().stream().anyMatch(state.poolByForm::containsKey)) {
                     quarantine(contents, "invalid or overlapping compression pool " + index);
                     return;
@@ -216,20 +218,25 @@ public final class BulkCellInventory implements StorageCell {
             stack.remove(BulkStorageMod.CONTENTS);
         } else {
             var rows = new ListTag();
-            for (var entry : amounts.object2LongEntrySet()) {
+            boolean wide = false;
+            for (var entry : amounts.object2ObjectEntrySet()) {
                 var row = new CompoundTag();
                 row.put("key", AEItemKey.CODEC.encodeStart(ops, entry.getKey()).getOrThrow());
-                row.putLong("amount", entry.getLongValue());
+                wide |= StockAmount.write(row, "amount", entry.getValue());
                 rows.add(row);
             }
             var data = new CompoundTag();
-            data.putInt("version", state.pools.isEmpty() ? DATA_VERSION : POOL_VERSION);
             data.put("items", rows);
             if (!state.pools.isEmpty()) {
                 var pools = new ListTag();
-                state.pools.values().forEach(pool -> pools.add(pool.encode(ops)));
+                for (var pool : state.pools.values()) {
+                    var row = new CompoundTag();
+                    wide |= pool.encode(row, ops);
+                    pools.add(row);
+                }
                 data.put("pools", pools);
             }
+            data.putInt("version", wide ? WIDE_VERSION : state.pools.isEmpty() ? DATA_VERSION : POOL_VERSION);
             stack.set(BulkStorageMod.CONTENTS, CustomData.of(data));
         }
         state.persisted = stack.getOrDefault(BulkStorageMod.CONTENTS, CustomData.EMPTY);
@@ -329,12 +336,21 @@ public final class BulkCellInventory implements StorageCell {
 
     @FunctionalInterface
     public interface PhysicalStockVisitor {
-        void visit(AEItemKey key, long amount, boolean pool);
+        void visit(AEItemKey key, BigInteger amount, boolean pool);
     }
 
     public void visitPhysicalStock(PhysicalStockVisitor visitor) {
-        amounts.object2LongEntrySet().fastForEach(entry -> visitor.visit(entry.getKey(), entry.getLongValue(), false));
+        amounts.object2ObjectEntrySet().fastForEach(entry -> visitor.visit(entry.getKey(), entry.getValue(), false));
         state.pools.values().forEach(pool -> visitor.visit(pool.chain.base(), pool.units, true));
+    }
+
+    /** One row per retrievable key, folding the base units into any ordinary stock of that key. */
+    public void visitStock(java.util.function.BiConsumer<AEItemKey, BigInteger> visitor) {
+        amounts.keySet().forEach(key -> visitor.accept(key, physicalAmount(key)));
+        state.pools.values().forEach(pool -> {
+            var base = pool.chain.base();
+            if (!amounts.containsKey(base)) visitor.accept(base, pool.units);
+        });
     }
 
     public record Configuration(FilterConfig filter, String limits, boolean sorting, @Nullable ItemContainerContents upgrades) {}
@@ -411,7 +427,7 @@ public final class BulkCellInventory implements StorageCell {
         private final BulkScheduler scheduler;
         private int viewers;
         private long revision = -1;
-        private java.util.Iterator<Object2LongMap.Entry<AEItemKey>> ordinary;
+        private java.util.Iterator<Object2ObjectMap.Entry<AEItemKey, BigInteger>> ordinary;
         private java.util.Iterator<CompressionPool> pools;
         private java.util.Iterator<BulkInventoryPreview.Entry> selected;
         private BulkInventoryPreview.Selection selection;
@@ -435,7 +451,7 @@ public final class BulkCellInventory implements StorageCell {
         private boolean collect(BulkScheduler.Allowance allowance) {
             if (revision != state.revision) {
                 revision = state.revision;
-                ordinary = amounts.object2LongEntrySet().fastIterator();
+                ordinary = amounts.object2ObjectEntrySet().fastIterator();
                 pools = state.pools.values().iterator();
                 selected = null;
                 selection = new BulkInventoryPreview.Selection();
@@ -444,7 +460,7 @@ public final class BulkCellInventory implements StorageCell {
             for (int i = 0; i < 512 && allowance.takeKey(); ++i) {
                 if (ordinary.hasNext()) {
                     var entry = ordinary.next();
-                    selection.add(entry.getKey(), entry.getLongValue(), false);
+                    selection.add(entry.getKey(), entry.getValue(), false);
                 } else if (pools.hasNext()) {
                     var pool = pools.next();
                     selection.add(pool.chain.base(), pool.units, true);
@@ -479,13 +495,27 @@ public final class BulkCellInventory implements StorageCell {
     }
 
     public long amount(AEItemKey key) {
-        long ordinary = amounts.getLong(key);
+        return StockAmount.toLong(amountExact(key));
+    }
+
+    public BigInteger amountExact(AEItemKey key) {
+        var ordinary = ordinaryAmount(key);
         var pool = state.poolByForm.get(key);
         if (pool == null) {
             return ordinary;
         }
         long factor = pool.factor(key, compressionInstalled());
-        return factor == 0 ? ordinary : saturated(ordinary, pool.units / factor);
+        return factor == 0 ? ordinary : ordinary.add(StockAmount.items(pool.units, factor));
+    }
+
+    private BigInteger ordinaryAmount(AEItemKey key) {
+        return amounts.getOrDefault(key, BigInteger.ZERO);
+    }
+
+    private BigInteger physicalAmount(AEItemKey key) {
+        var amount = ordinaryAmount(key);
+        var pool = state.pools.get(key);
+        return pool == null ? amount : amount.add(pool.units);
     }
 
     @Override
@@ -548,31 +578,28 @@ public final class BulkCellInventory implements StorageCell {
                 return insertCompressed(itemKey, amount, mode, chain, pendingNotifications);
             }
         }
-        long current = amounts.getLong(itemKey);
+        var current = ordinaryAmount(itemKey);
         long inserted = acceptedAmount(itemKey, amount, current);
         if (inserted > 0 && mode == Actionable.MODULATE) {
-            amounts.put(itemKey, current + inserted);
-            markChanged(current == 0);
-            recordStock(itemKey, inserted, pendingNotifications);
+            var delta = BigInteger.valueOf(inserted);
+            amounts.put(itemKey, current.add(delta));
+            markChanged(current.signum() == 0);
+            recordStock(itemKey, delta, pendingNotifications);
             if (pendingNotifications == null) publishChange();
         }
         return inserted;
     }
 
-    private long acceptedAmount(AEItemKey itemKey, long amount, long current) {
+    private long acceptedAmount(AEItemKey itemKey, long amount, BigInteger current) {
         if (!accepts(itemKey)) {
             return 0;
         }
         var settings = BulkConfig.cell(item.tier());
-        if (current == 0 && (types() >= settings.types().get()
+        if (current.signum() == 0 && (types() >= settings.types().get()
                 || StorageCells.isCellHandled(itemKey.getReadOnlyStack()))) {
             return 0;
         }
-        long limit = settings.itemsPerType().get();
-        var pool = state.pools.get(itemKey);
-        long poolUnits = pool == null ? 0 : pool.units;
-        long stored = saturated(current, poolUnits);
-        return Math.min(amount, Math.min(Math.max(0, limit - Math.min(limit, stored)), limitHeadroom(itemKey, stored)));
+        return limitInsertion(itemKey, amount, 1, settings.itemsPerType().get());
     }
 
     private long insertCompressed(AEItemKey key, long amount, Actionable mode, CompressionCatalog.Chain chain,
@@ -590,21 +617,17 @@ public final class BulkCellInventory implements StorageCell {
             return 0;
         }
         long factor = chain.factor(key);
-        long units = pool == null ? 0 : pool.units;
-        long rawBase = amounts.getLong(chain.base());
-        long limit = settings.itemsPerType().get();
-        long stored = saturated(rawBase, units);
-        long accepted = Math.min(amount,
-                Math.min(limit - Math.min(limit, stored), limitHeadroom(chain.base(), stored)) / factor);
+        long accepted = limitInsertion(chain.base(), amount, factor, settings.itemsPerType().get());
         if (accepted > 0 && mode == Actionable.MODULATE) {
             boolean newPool = pool == null;
             if (newPool) {
-                pool = new CompressionPool(chain, 0);
+                pool = new CompressionPool(chain, BigInteger.ZERO);
                 registerPool(pool);
             }
-            pool.units += accepted * factor;
+            var delta = StockAmount.units(accepted, factor);
+            pool.units = pool.units.add(delta);
             markChanged(newPool);
-            recordStock(chain.base(), accepted * factor, pendingNotifications);
+            recordStock(chain.base(), delta, pendingNotifications);
             if (pendingNotifications == null) publishChange();
         }
         return accepted;
@@ -648,9 +671,20 @@ public final class BulkCellInventory implements StorageCell {
         }
     }
 
-    private long limitHeadroom(AEItemKey key, long stored) {
+    private long limitInsertion(AEItemKey key, long requested, long factor, long configuredCap) {
         var ledger = limitLedger();
-        return ledger == null ? Long.MAX_VALUE : ledger.remaining(key, stored);
+        if (ledger == null && configuredCap == Long.MAX_VALUE) return requested;
+        var stored = physicalAmount(key);
+        long headroom = configuredHeadroom(configuredCap, stored);
+        if (ledger != null) {
+            headroom = LimitProfile.Ledger.minimum(headroom, ledger.remaining(key, stored, true, true));
+        }
+        return headroom == LimitProfile.Ledger.UNLIMITED ? requested : Math.min(requested, headroom / factor);
+    }
+
+    private static long configuredHeadroom(long cap, BigInteger stored) {
+        // The old default Long.MAX_VALUE now means no per-key cap. Explicit lower values still apply.
+        return cap == Long.MAX_VALUE ? LimitProfile.Ledger.UNLIMITED : LimitProfile.Ledger.remaining(cap, stored);
     }
 
     private @Nullable LimitProfile.Ledger limitLedger() {
@@ -666,7 +700,7 @@ public final class BulkCellInventory implements StorageCell {
             state.limits = new LimitProfile.Ledger(LimitProfile.parse(text));
             state.limitsText = text;
             state.limitsGeneration = generation;
-            amounts.object2LongEntrySet().forEach(entry -> state.limits.change(entry.getKey(), entry.getLongValue()));
+            amounts.forEach(state.limits::change);
             state.pools.values().forEach(pool -> state.limits.change(pool.chain.base(), pool.units));
         }
         return state.limits;
@@ -692,23 +726,22 @@ public final class BulkCellInventory implements StorageCell {
         var base = chain == null ? key : chain.base();
         var pool = state.pools.get(base);
         long factor = chain == null ? 1 : chain.factor(key);
-        boolean newType = chain == null ? amounts.getLong(key) == 0 : pool == null;
+        boolean newType = chain == null ? !amounts.containsKey(key) : pool == null;
         if (StorageCells.isCellHandled(key.getReadOnlyStack())
                 || newType && simulatedInsertion == 0 && types() >= maximumTypes()
                 || chain != null && (pool != null && !pool.chain.equals(chain)
                         || pool == null && chain.factors().keySet().stream().anyMatch(state.poolByForm::containsKey))) {
             return 0;
         }
-        long present = saturated(amounts.getLong(base), pool == null ? 0 : pool.units);
-        long plannedUnits = simulatedInsertion * factor;
-        long hardCap = BulkConfig.cell(tier()).itemsPerType().get();
-        long hard = Math.max(0, hardCap - Math.min(hardCap, present));
-        long refusing = ledger.remaining(base, present, false);
-        long discarding = ledger.remaining(base, present, true);
-        if (discarding == Long.MAX_VALUE || Math.max(0, discarding - plannedUnits) >= factor) {
+        var present = physicalAmount(base);
+        long discarding = ledger.remaining(base, present, false, true);
+        if (discarding == LimitProfile.Ledger.UNLIMITED || discarding / factor > simulatedInsertion) {
             return 0;
         }
-        long discarded = Math.min(amount, Math.max(0, Math.min(hard, refusing) - plannedUnits) / factor);
+        long hard = configuredHeadroom(BulkConfig.cell(tier()).itemsPerType().get(), present);
+        long refusing = LimitProfile.Ledger.minimum(hard, ledger.remaining(base, present, true, false));
+        long discarded = refusing == LimitProfile.Ledger.UNLIMITED ? amount
+                : Math.min(amount, Math.max(0, refusing / factor - simulatedInsertion));
         long previousDiscarded = discardedItems();
         discarded = Math.min(discarded, Long.MAX_VALUE - previousDiscarded);
         if (discarded > 0 && mode == Actionable.MODULATE) {
@@ -718,24 +751,24 @@ public final class BulkCellInventory implements StorageCell {
         return discarded;
     }
 
-    private record StockDelta(BulkCellInventory inventory, AEItemKey key, long amount) {
+    private record StockDelta(BulkCellInventory inventory, AEItemKey key, BigInteger amount) {
         void publish() { inventory.notifyStock(key, amount); }
     }
 
-    private void recordLimit(AEItemKey key, long delta) {
+    private void recordLimit(AEItemKey key, BigInteger delta) {
         if (state.limits != null) {
             state.limits.change(key, delta);
         }
     }
 
-    private void recordStock(AEItemKey key, long delta, @Nullable List<StockDelta> pendingNotifications) {
-        if (delta == 0) return;
+    private void recordStock(AEItemKey key, BigInteger delta, @Nullable List<StockDelta> pendingNotifications) {
+        if (delta.signum() == 0) return;
         recordLimit(key, delta);
         if (pendingNotifications == null) notifyStock(key, delta);
         else pendingNotifications.add(new StockDelta(this, key, delta));
     }
 
-    private void notifyStock(AEItemKey key, long delta) {
+    private void notifyStock(AEItemKey key, BigInteger delta) {
         var sorter = state.stockListener == null ? null : state.stockListener.get();
         if (sorter != null) {
             try {
@@ -784,7 +817,8 @@ public final class BulkCellInventory implements StorageCell {
             keys.add(pool.chain.base());
             return;
         }
-        pool.chain.factors().entrySet().stream().filter(form -> form.getValue() <= pool.units)
+        long visibleUnits = StockAmount.toLong(pool.units);
+        pool.chain.factors().entrySet().stream().filter(form -> form.getValue() <= visibleUnits)
                 .sorted(java.util.Map.Entry.<AEItemKey, Long>comparingByValue().reversed())
                 .forEach(form -> keys.add(form.getKey()));
     }
@@ -814,27 +848,31 @@ public final class BulkCellInventory implements StorageCell {
             }
             return accepted;
         }
-        long before = amounts.getLong(key);
-        if (before <= 0) {
+        var before = ordinaryAmount(key);
+        if (before.signum() == 0) {
             return 0;
         }
-        long targetBefore = target.amounts.getLong(key);
-        long amount = target.acceptedAmount(key, Math.min(before, requested), targetBefore);
+        var targetBefore = target.ordinaryAmount(key);
+        long amount = target.acceptedAmount(key, Math.min(StockAmount.toLong(before), requested), targetBefore);
         if (amount <= 0) {
             return 0;
         }
-        if (before == amount) {
-            amounts.removeLong(key);
+        var delta = BigInteger.valueOf(amount);
+        var remaining = before.subtract(delta);
+        boolean emptied = remaining.signum() == 0;
+        if (emptied) {
+            amounts.remove(key);
         } else {
-            amounts.put(key, before - amount);
+            amounts.put(key, remaining);
         }
-        target.amounts.put(key, targetBefore + amount);
-        recordLimit(key, -amount);
-        target.recordLimit(key, amount);
-        markChanged(before == amount);
-        target.markChanged(targetBefore == 0);
-        notifyStock(key, -amount);
-        target.notifyStock(key, amount);
+        target.amounts.put(key, targetBefore.add(delta));
+        var removed = delta.negate();
+        recordLimit(key, removed);
+        target.recordLimit(key, delta);
+        markChanged(emptied);
+        target.markChanged(targetBefore.signum() == 0);
+        notifyStock(key, removed);
+        target.notifyStock(key, delta);
         return amount;
     }
 
@@ -847,30 +885,37 @@ public final class BulkCellInventory implements StorageCell {
         if (state.quarantined || amount <= 0 || !(key instanceof AEItemKey itemKey)) {
             return 0;
         }
-        long current = amounts.getLong(itemKey);
-        long raw = Math.min(amount, current);
+        var current = ordinaryAmount(itemKey);
+        long raw = Math.min(amount, StockAmount.toLong(current));
         var pool = state.poolByForm.get(itemKey);
         long factor = pool == null ? 0 : pool.factor(itemKey, compressionInstalled());
-        long pooled = factor > 0 ? Math.min(amount - raw, pool.units / factor) : 0;
+        long pooled = factor > 0 && amount > raw ? Math.min(amount - raw, StockAmount.toLong(
+                StockAmount.items(pool.units, factor))) : 0;
         if ((raw > 0 || pooled > 0) && mode == Actionable.MODULATE) {
             boolean keysChanged = false;
-            if (raw > 0 && raw == current) {
-                amounts.removeLong(itemKey);
-                keysChanged = true;
-            } else if (raw > 0) {
-                amounts.put(itemKey, current - raw);
+            var rawDelta = BigInteger.valueOf(-raw);
+            if (raw > 0) {
+                var remaining = current.add(rawDelta);
+                if (remaining.signum() == 0) {
+                    amounts.remove(itemKey);
+                    keysChanged = true;
+                } else {
+                    amounts.put(itemKey, remaining);
+                }
             }
+            var poolDelta = BigInteger.ZERO;
             if (pooled > 0) {
-                pool.units -= pooled * factor;
-                if (pool.units == 0) {
+                poolDelta = StockAmount.units(-pooled, factor);
+                pool.units = pool.units.add(poolDelta);
+                if (pool.units.signum() == 0) {
                     state.pools.remove(pool.chain.base());
                     pool.chain.factors().keySet().forEach(state.poolByForm::remove);
                     keysChanged = true;
                 }
             }
             markChanged(keysChanged);
-            if (pooled > 0) recordStock(pool.chain.base(), -(pooled * factor), pendingNotifications);
-            recordStock(itemKey, -raw, pendingNotifications);
+            if (pooled > 0) recordStock(pool.chain.base(), poolDelta, pendingNotifications);
+            recordStock(itemKey, rawDelta, pendingNotifications);
             if (pendingNotifications == null) publishChange();
         }
         return raw + pooled;
@@ -882,28 +927,25 @@ public final class BulkCellInventory implements StorageCell {
         if (state.quarantined || amount <= 0 || !(key instanceof AEItemKey itemKey)) {
             return 0;
         }
-        long current = amounts.getLong(itemKey);
-        long restored = Math.min(amount, Long.MAX_VALUE - current);
-        if (restored > 0) {
-            amounts.put(itemKey, current + restored);
-            markChanged(current == 0);
-            recordStock(itemKey, restored, null);
-            publishChange();
-        }
-        return restored;
+        var current = ordinaryAmount(itemKey);
+        var delta = BigInteger.valueOf(amount);
+        amounts.put(itemKey, current.add(delta));
+        markChanged(current.signum() == 0);
+        recordStock(itemKey, delta, null);
+        publishChange();
+        return amount;
     }
 
     @Override
     public void getAvailableStacks(KeyCounter out) {
-        for (var entry : amounts.object2LongEntrySet()) {
+        for (var iterator = amounts.object2ObjectEntrySet().fastIterator(); iterator.hasNext();) {
+            var entry = iterator.next();
             var key = entry.getKey();
-            long previous = out.get(key);
-            long added = entry.getLongValue();
-            out.set(key, previous > Long.MAX_VALUE - added ? Long.MAX_VALUE : previous + added);
+            out.set(key, saturated(out.get(key), StockAmount.toLong(entry.getValue())));
         }
         for (var pool : state.pools.values()) {
             var key = pool.chain.base();
-            out.set(key, saturated(out.get(key), pool.units));
+            out.set(key, saturated(out.get(key), StockAmount.toLong(pool.units)));
         }
     }
 

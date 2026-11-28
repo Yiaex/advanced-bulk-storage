@@ -71,7 +71,8 @@ public final class BulkConfig {
                     builder.defineInRange("upgrades", tier.defaultSlots(), 1, 8),
                     builder.defineInRange("tags", tier.defaultTags(), 0, 128),
                     builder.defineInRange("idleDrain", tier.defaultDrain(), 0.01, 4096),
-                    builder.defineInRange("itemsPerType", Long.MAX_VALUE, 1, Long.MAX_VALUE)));
+                    builder.comment("9223372036854775807 (the old default) means no per-key cap.")
+                            .defineInRange("itemsPerType", Long.MAX_VALUE, 1, Long.MAX_VALUE)));
             builder.pop();
         }
         builder.pop();

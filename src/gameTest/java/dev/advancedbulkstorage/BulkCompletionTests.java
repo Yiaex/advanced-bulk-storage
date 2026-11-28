@@ -158,7 +158,7 @@ public final class BulkCompletionTests {
         class Observer implements BulkCellInventory.StockListener {
             long observed;
 
-            @Override public void changed(AEItemKey key, long delta) {
+            @Override public void changed(AEItemKey key, java.math.BigInteger delta) {
                 observed = target.amount(NUGGET);
                 targetStack.set(BulkStorageMod.FILTER, new FilterConfig("minecraft:diamond", false));
                 source.removeStockMonitor(this);

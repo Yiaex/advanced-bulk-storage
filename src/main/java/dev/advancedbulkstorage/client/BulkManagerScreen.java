@@ -120,7 +120,7 @@ public final class BulkManagerScreen extends AEBaseScreen<BulkManagerMenu> {
             if (button.visible) {
                 var row = view.rows().get(i);
                 String label = view.cell().isEmpty() ? text("usage_row", row.name(), row.amount(), row.capacity()).getString()
-                        : row.name() + (row.pool() ? " *" : "") + " × " + row.amount();
+                        : row.name() + (row.pool() ? " *" : "") + " × " + (row.stock() == null ? row.amount() : row.stock());
                 button.setMessage(Component.literal(font.plainSubstrByWidth(label, 208)));
                 var extra = row.id().isEmpty() ? Component.literal(row.item()).append(row.pool()
                         ? Component.literal("\n").append(text("pool")) : Component.empty())

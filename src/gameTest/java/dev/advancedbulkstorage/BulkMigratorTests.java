@@ -11,7 +11,9 @@ import dev.advancedbulkstorage.device.BulkMigratorEntity;
 import dev.advancedbulkstorage.device.MigratorTier;
 import dev.advancedbulkstorage.filter.FilterConfig;
 import dev.advancedbulkstorage.migration.BulkScheduler;
+import dev.advancedbulkstorage.storage.BulkCellInventory;
 import dev.advancedbulkstorage.storage.CellTransfer;
+import java.math.BigInteger;
 import java.util.concurrent.atomic.AtomicInteger;
 import net.minecraft.core.BlockPos;
 import net.minecraft.gametest.framework.GameTest;
@@ -82,11 +84,13 @@ public final class BulkMigratorTests {
         var source = cell(CellTier.QUANTUM, 64, 0);
         var nearFull = cell(CellTier.QUANTUM, Long.MAX_VALUE - 5, 0);
         var from = StorageCells.getCellInventory(source, null);
-        var to = StorageCells.getCellInventory(nearFull, null);
+        var to = (BulkCellInventory) StorageCells.getCellInventory(nearFull, null);
         var pair = CellTransfer.begin(source, from, nearFull, to);
-        test.assertTrue(pair.move(IRON, 1_000_000_000L) == 5 && pair.move(IRON, 100) == 0, "LONG capacity was ignored");
-        test.assertTrue(pair.commit((left, right) -> {}) && from.getAvailableStacks().get(IRON) == 59
-                && to.getAvailableStacks().get(IRON) == Long.MAX_VALUE, "Partial transfer was unsafe");
+        test.assertTrue(pair.move(IRON, 1_000_000_000L) == 64 && pair.move(IRON, 100) == 0, "Transfer truncated at LONG");
+        test.assertTrue(pair.commit((left, right) -> {}) && from.getAvailableStacks().get(IRON) == 0
+                && to.getAvailableStacks().get(IRON) == Long.MAX_VALUE
+                && to.amountExact(IRON).equals(BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.valueOf(59))),
+                "Direct transfer lost the units above LONG");
         test.succeed();
     }
 

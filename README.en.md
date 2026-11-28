@@ -2,7 +2,7 @@
 
 [简体中文](README.md)
 
-**Advanced Bulk Storage 1.0.0** is an add-on for Applied Energistics 2 and MEGA Cells on Minecraft **1.21.1** and NeoForge **21.1.265 up to but excluding 21.2**. Its mod ID is `advanced_bulk_storage`. Four bulk storage cells store signed 64-bit quantities per exact item key in standard ME drives. Hold a cell to edit its allowlist or browse its inventory, and hover over it to preview its contents.
+**Advanced Bulk Storage** is an add-on for Applied Energistics 2 and MEGA Cells on Minecraft **1.21.1** and NeoForge **21.1.265 up to but excluding 21.2**. Its mod ID is `advanced_bulk_storage`. Four bulk storage cells keep arbitrary-precision quantities per exact item key in standard ME drives. Hold a cell to edit its allowlist or browse its inventory, and hover over it to preview its contents.
 
 Version 1.0.0 includes bulk interface performance improvements, recipe changes, a smithing template for empty cells, and interface fixes. When upgrading, replace the mod JAR on both the client and server. [1.0.0 changelog (Chinese)](CHANGELOG-1.0.0.md) · [Version history (Chinese)](CHANGELOG.md) · [Feature list and manual checks (Chinese)](RELEASE-0.6.0.md)
 
@@ -33,7 +33,7 @@ Install the mod in the `mods` directory on both the Minecraft client and server.
 2. Right-click while holding a cell to open its filter editor. Choose a preset or enter an allowlist and save it. Tag cells accept filters such as `#c:ingots`, and mod cells accept namespaces such as `@ae2`. Quantum cells can combine tags, namespaces, and exact item IDs.
 3. Mount the cell in a powered ME Drive with a channel. Use an ME Storage Terminal to insert and extract items. Exact partitioning from the AE2 Cell Workbench applies alongside the bulk storage filter.
 4. Install an Extended Tag Card at the AE2 Cell Workbench to unlock the full filter syntax. Removing the card preserves the expression. A rule that exceeds the cell’s current permissions stops accepting new items, and its existing stock remains extractable.
-5. Select **Inventory** to browse the cell. Search by name, registry ID, `@namespace`, or `#tag`. Sort by name or count and hover to see the full 64-bit quantity.
+5. Select **Inventory** to browse the cell. Search by name, registry ID, `@namespace`, or `#tag`. Sort by name or count and hover for the detailed quantity.
 6. With JEI installed, drag an item from the JEI list into the editor’s **+** slot to see its registered tags and supported filter conditions. Click a condition to add it to the draft, then save to update the allowlist.
 7. Hover over a bulk cell to preview its nine most abundant items. Holding Shift shows up to 36 by default. Each row holds up to nine icons, and the tooltip uses fewer rows when screen space is limited.
 8. Connect a regular or advanced ME Bulk Storage Interface to a powered network and right-click it to bind mounted bulk cells from that network. The regular interface binds one cell and has a base draw of 4 AE/t. The advanced interface binds up to 16 and has a base draw of 16 AE/t. It supports binding priorities, independent side modes, a second allowlist, and redstone control. Each interface uses one channel.
@@ -48,7 +48,7 @@ Install the mod in the `mods` directory on both the Minecraft client and server.
 | Mod | 1,024 | 4 | 32 AE/t |
 | Quantum | 4,096 | 6 | 64 AE/t |
 
-Each exact item key defaults to a maximum of 9,223,372,036,854,775,807 items. Existing stock remains extractable after a rule changes or a quantity or type limit is lowered.
+Cells and compression pools use `BigInteger` quantities. The old `itemsPerType` default of `9223372036854775807` now disables the per-key cap. Lower server config values and explicit storage limit card rules still apply. Existing stock remains extractable after a rule changes or a quantity or type limit is lowered.
 
 Filters support bounded wildcards such as `#c:ingots/*`. Matches are computed from the loaded registries and tags. A bare `*`, any rule that covers every registered item, and legacy blocklists stop new insertions. The old rule text remains available until you save a valid allowlist. Broad filters exclude equipment by default. An exact item ID can admit specific equipment when the cell and server settings permit it.
 
@@ -127,7 +127,7 @@ The `name` and `description` values can reference language keys from a resource 
 
 ## Inventory integration
 
-AE2 integrations can use `StorageCells` and `StorageCell`. NeoForge transports can access an `ItemHandler` on all six sides. For bulk transfers, use `BulkItemAccess.CAPABILITY` on the server to query and move stock by exact `AEItemKey`. An interface’s visible quantity per key and each bulk transfer are bounded by the signed 32-bit range. The cell stores signed 64-bit quantities. The standard item handler returns stacks that respect an item’s maximum stack size. An adjacent AE2 Storage Bus cannot remount storage exposed by a bulk interface.
+AE2 integrations can use `StorageCells` and `StorageCell`. An AE2 call can move up to `Long.MAX_VALUE` items. Counts above that value report `Long.MAX_VALUE` and can be withdrawn in batches. NeoForge transports can access an `ItemHandler` on all six sides. `BulkItemAccess.CAPABILITY` queries and transfers by exact `AEItemKey` on the server, with an `Integer.MAX_VALUE` limit per key and call. The standard item handler respects each item’s maximum stack size. An adjacent AE2 Storage Bus cannot remount storage exposed by a bulk interface.
 
 ## Verification scope
 

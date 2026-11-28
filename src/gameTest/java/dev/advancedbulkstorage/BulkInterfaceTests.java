@@ -113,6 +113,11 @@ public final class BulkInterfaceTests {
             test.assertTrue(basicPort.count(IRON) == Integer.MAX_VALUE
                     && actual(drive, 3).amount(IRON) == Long.MAX_VALUE - 7,
                     "A moved disk lost its UUID or real inventory");
+            var wide = java.math.BigInteger.valueOf(Long.MAX_VALUE).add(java.math.BigInteger.valueOf(4));
+            test.assertTrue(basicPort.insert(IRON, 11, REAL) == 11 && basicPort.count(IRON) == Integer.MAX_VALUE
+                    && actual(drive, 3).amountExact(IRON).equals(wide)
+                    && basicPort.extract(IRON, 11, REAL) == 11 && actual(drive, 3).amount(IRON) == Long.MAX_VALUE - 7,
+                    "The INT automation boundary changed physical stock beyond LONG");
             for (var id : java.util.List.of("bulk_storage_interface", "advanced_bulk_storage_interface")) {
                 test.assertTrue(level.getRecipeManager().byKey(BulkStorageMod.id(id)).isPresent(), "Missing recipe " + id);
             }

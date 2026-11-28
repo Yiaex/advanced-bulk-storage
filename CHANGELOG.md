@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0-dev
+
+- All four bulk cells and their compression pools keep exact `BigInteger` quantities. AE2 counts and individual transfers remain bounded by signed `long`.
+- Existing v1 and v2 inventories load directly. A cell uses v3 only while an item or pool exceeds `Long.MAX_VALUE`. Use the same mod build on the server and clients. Keep an original world backup before upgrading because previous builds cannot open v3 inventories.
+
+- 四级大宗盘和压缩池均使用 `BigInteger` 记账。AE2 的可见库存与单次存取数量仍受有符号 `long` 范围限制。
+- 兼容 v1、v2 库存。只有单项库存或压缩池超过 `Long.MAX_VALUE` 时才写入 v3。服务端和客户端请使用同一版本。升级前保留原存档备份，旧版本无法读取 v3 库存。
+
 ## 1.0.0
 
 - 发布首个 1.0 正式版。汇总 0.6.1-dev 至 0.6.8-dev 的大宗接口性能优化、配方与指南调整，以及库存界面和空盘锻造自动合成修复。[1.0.0 累积更新日志](CHANGELOG-1.0.0.md)

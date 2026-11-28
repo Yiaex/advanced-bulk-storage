@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'dev.advancedbulkstorage'
-version = '1.0.0'
+version = '1.1.0-dev'
 base.archivesName = 'advanced_bulk_storage'
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 java.withSourcesJar()

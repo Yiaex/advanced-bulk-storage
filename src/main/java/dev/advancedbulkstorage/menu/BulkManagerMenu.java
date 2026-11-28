@@ -12,6 +12,8 @@ import dev.advancedbulkstorage.migration.BulkScheduler;
 import dev.advancedbulkstorage.storage.BulkCellIndex;
 import dev.advancedbulkstorage.storage.BulkCellInventory;
 import dev.advancedbulkstorage.storage.LimitProfile;
+import dev.advancedbulkstorage.storage.StockAmount;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -32,7 +34,7 @@ public final class BulkManagerMenu extends AEBaseMenu {
     private UUID selected;
     private long revision = -1;
     private BulkCellInventory lastInventory;
-    private List<Row> lastStock = List.of();
+    private List<StockRow> lastStock = List.of();
     private List<DisplayedTarget> visible = List.of();
     private int scope;
     private int order;
@@ -46,8 +48,9 @@ public final class BulkManagerMenu extends AEBaseMenu {
     public record Change(String operation, String text, boolean batch, int token) {}
     private record DisplayedTarget(UUID id, BulkCellIndex.Mount mount) {}
     private record QueuedTarget(DisplayedTarget target, BulkCellInventory.Configuration before) {}
+    private record StockRow(String name, String item, BigInteger amount, boolean pool) {}
     public record Row(String id, String name, String item, long amount, String position, String state,
-                      int capacity, boolean pool) {}
+                      int capacity, boolean pool, String stock) {}
     public record Details(String filter, String limits, List<String> upgrades, int used, int maximum, int pools,
                           long sortRate, long discarded, int priority, double power, long bindings, String position,
                           boolean sorting, boolean limitCard, boolean canEdit, boolean discardConfigured) {}
@@ -186,6 +189,7 @@ public final class BulkManagerMenu extends AEBaseMenu {
     private void publish() {
         var index = host.index();
         var rows = new ArrayList<Row>();
+        List<StockRow> matching = List.of();
         String title = "";
         Details details = null;
         var mount = index == null || selected == null ? null : index.mounted(selected);
@@ -201,7 +205,7 @@ public final class BulkManagerMenu extends AEBaseMenu {
                         || inventory.tier().id().contains(search)) {
                     rows.add(new Row(candidate.id().toString(), shorten(name), BulkStorageMod.id(inventory.tier().id()).toString(),
                             inventory.types(), position, inventory.quarantined() ? "quarantined" : online ? "online" : "offline",
-                            inventory.maximumTypes(), false));
+                            inventory.maximumTypes(), false, ""));
                 }
             }
             Comparator<Row> sort = switch (order) {
@@ -216,15 +220,15 @@ public final class BulkManagerMenu extends AEBaseMenu {
             var inventory = mount.inventory();
             if (online) {
                 if (lastInventory != inventory || revision != inventory.revision()) {
-                    var stock = new ArrayList<Row>();
-                    inventory.visitPhysicalStock((key, amount, pool) -> stock.add(new Row("", shorten(key.getDisplayName().getString()),
-                            key.getId().toString(), amount, "", "", 0, pool)));
-                    stock.sort(Comparator.comparingLong(Row::amount).reversed().thenComparing(Row::item));
+                    var stock = new ArrayList<StockRow>();
+                    inventory.visitPhysicalStock((key, amount, pool) -> stock.add(new StockRow(
+                            shorten(key.getDisplayName().getString()), key.getId().toString(), amount, pool)));
+                    stock.sort(Comparator.comparing(StockRow::amount).reversed().thenComparing(StockRow::item));
                     lastStock = stock;
                     lastInventory = inventory;
                     revision = inventory.revision();
                 }
-                lastStock.stream().filter(row -> contains(row.name()) || row.item().contains(search)).forEach(rows::add);
+                matching = lastStock.stream().filter(row -> contains(row.name()) || row.item().contains(search)).toList();
             }
             String limits = inventory.limitExpression();
             details = new Details(inventory.filterExpression(), limits, inventory.upgradeIds(), inventory.types(),
@@ -236,16 +240,21 @@ public final class BulkManagerMenu extends AEBaseMenu {
         } else if (selected != null) {
             title = selected.toString();
         }
-        page = Math.clamp(page, 0, Math.max(0, (rows.size() - 1) / PAGE_SIZE));
+        int total = selected == null ? rows.size() : matching.size();
+        page = Math.clamp(page, 0, Math.max(0, (total - 1) / PAGE_SIZE));
         int start = page * PAGE_SIZE;
-        var shown = rows.subList(start, Math.min(start + PAGE_SIZE, rows.size()));
+        int end = Math.min(start + PAGE_SIZE, total);
+        var shown = selected == null ? rows.subList(start, end)
+                : matching.subList(start, end).stream().map(row -> new Row("", row.name(), row.item(),
+                        StockAmount.toLong(row.amount()), "", "", 0, row.pool(),
+                        row.amount().bitLength() > 63 ? StockAmount.display(row.amount()) : null)).toList();
         var targets = (selected == null ? shown.stream().map(row -> UUID.fromString(row.id())) : java.util.stream.Stream.of(selected))
                 .map(id -> new DisplayedTarget(id, index == null ? null : index.mounted(id))).toList();
         if (!targets.equals(visible)) {
             visible = targets;
             viewToken++;
         }
-        result = JSON.toJson(new View(title, index != null, page, rows.size(), shown, scope, order, details));
+        result = JSON.toJson(new View(title, index != null, page, total, shown, scope, order, details));
     }
 
     private boolean contains(String text) { return text.toLowerCase(Locale.ROOT).contains(search); }
